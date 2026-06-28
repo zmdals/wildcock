@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>와일드콕</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#F5F5F7;--card:#FFF;--pri:#007AFF;--priH:#0056CC;--danger:#FF3B30;--green:#34C759;--orange:#FF9500;--purple:#AF52DE;--pink:#FF2D55;--teal:#5AC8FA;--g1:#8E8E93;--g2:#C7C7CC;--g3:#E5E5EA;--g4:#F2F2F7;--tx:#1D1D1F;--tx2:#86868B;--bdr:#E5E5EA;--r:14px;--rs:10px}
+body{font-family:-apple-system,"SF Pro Display","Helvetica Neue","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;min-height:100vh}
+input,button,select,textarea{font-family:inherit}
+
+/* 인쇄 */
+@media print{
+  body{background:#fff}
+  .no-print{display:none!important}
+  .cd,.print-block{page-break-inside:avoid;break-inside:avoid}
+  table{page-break-inside:avoid;break-inside:avoid}
+  h2,h3{page-break-after:avoid;break-after:avoid}
+}
+
+.hdr{background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--bdr);position:sticky;top:0;z-index:100}
+.hdr-in{max-width:760px;margin:0 auto;padding:0 20px}
+.ttl{font-size:26px;font-weight:700;letter-spacing:-.5px;padding:14px 0 10px;display:flex;align-items:center;gap:8px;cursor:default;user-select:none}
+.mt{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch}.mt>button{padding:10px 16px;font-size:13px;font-weight:600;color:var(--g1);background:none;border:none;border-bottom:2.5px solid transparent;cursor:pointer;transition:all .2s;white-space:nowrap}.mt>button.on{color:var(--pri);border-bottom-color:var(--pri)}
+.st{display:flex}.st>button{flex:1;padding:9px 0;text-align:center;font-size:13px;font-weight:600;color:var(--g1);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s}.st>button.on{color:var(--pri);border-bottom-color:var(--pri)}
+.mn{max-width:760px;margin:0 auto;padding:20px 20px 120px}
+.cd{background:var(--card);border-radius:var(--r);padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06)}
+.sl{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.inp{width:100%;padding:11px 14px;font-size:15px;border:1px solid var(--g3);border-radius:var(--rs);outline:none;background:var(--g4);color:var(--tx);transition:border-color .2s,box-shadow .2s}.inp:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(0,122,255,.12);background:#fff}
+.btn{padding:11px 22px;font-size:14px;font-weight:600;border:none;border-radius:var(--rs);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{color:#fff;background:var(--pri)}.bp:hover{background:var(--priH)}.bp:disabled{opacity:.4;cursor:not-allowed}
+.bs{color:var(--pri);background:rgba(0,122,255,.08)}.bs:hover{background:rgba(0,122,255,.14)}
+.bgn{color:#fff;background:var(--green)}.bd{color:var(--danger);background:rgba(255,59,48,.08)}
+.bf{width:100%;justify-content:center}
+.pill{padding:8px 18px;font-size:13px;font-weight:600;border:none;border-radius:100px;cursor:pointer;transition:all .2s}
+.p-on{color:#fff;background:var(--pri)}.p-off{color:var(--tx);background:var(--g4)}.p-off:hover{background:var(--g3)}
+.badge{display:inline-block;padding:3px 9px;font-size:11px;font-weight:600;border-radius:20px}
+.ri{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--g4);border-radius:11px}.ri+.ri{margin-top:5px}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tc{padding:14px;background:var(--g4);border-radius:var(--r);border:1px solid var(--g3)}
+.tc.bonus{border:1.5px dashed var(--orange);background:#FFFBF5}
+.mr{display:flex;align-items:center;background:var(--g4);border-radius:var(--r);overflow:hidden;border:1px solid var(--g3)}.mr+.mr{margin-top:8px}
+.msd{flex:1;padding:12px 14px;text-align:center}.msd-n{font-size:13px;font-weight:600}.msd-s{font-size:11px;color:var(--tx2);margin-top:3px}
+.hint{font-size:13px;color:var(--tx2);line-height:1.6;margin-bottom:14px}
+.es{text-align:center;padding:50px 20px}.es-i{font-size:40px;margin-bottom:10px}.es-t{font-size:16px;font-weight:600;margin-bottom:6px}.es-s{font-size:14px;color:var(--tx2)}
+.bye-b{background:linear-gradient(135deg,#FFF3E0,#FFF8F0);border:1px solid rgba(255,149,0,.2)}
+.fb{display:flex;justify-content:space-between;align-items:center}
+.fg{display:flex;gap:8px;align-items:center}.fw{flex-wrap:wrap}
+.skb{width:34px;height:38px;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;transition:all .15s;border:1px solid var(--g3);background:var(--g4);color:var(--g1)}.skb.on{border-width:2px}.skb-s{width:26px;height:26px;border-radius:7px;font-size:11px}
+.gb{min-width:36px;height:38px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s;border:1px solid var(--g3);background:var(--g4);color:var(--g1);padding:0 10px}.gb.on{border-width:2px}.gb-s{min-width:28px;height:26px;border-radius:7px;font-size:11px;padding:0 6px}
+.si{width:40px;height:36px;text-align:center;font-size:16px;font-weight:700;border:1.5px solid var(--g3);border-radius:8px;background:#fff;color:var(--tx);outline:none}.si:focus{border-color:var(--pri);box-shadow:0 0 0 2px rgba(0,122,255,.15)}
+.sc{font-size:20px;font-weight:700;color:var(--g2);margin:0 4px}
+.wt{font-size:10px;font-weight:700;color:#fff;background:var(--green);padding:2px 8px;border-radius:10px;margin-top:4px;display:inline-block}
+.ls{opacity:.45}
+.dual-tag{font-size:9px;font-weight:700;color:var(--orange);background:rgba(255,149,0,.12);padding:1px 6px;border-radius:6px;margin-left:4px}
+.court-tag{font-size:9px;font-weight:700;color:#fff;padding:2px 8px;border-radius:6px;margin-bottom:6px;display:inline-block}
+.rr{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:11px}.rr:nth-child(even){background:var(--g4)}
+.rb{height:6px;border-radius:3px;background:var(--g3);flex:1;overflow:hidden}.rf{height:100%;border-radius:3px;background:var(--pri);transition:width .3s}
+.dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:12px}
+.dp-btn{padding:10px;border-radius:10px;border:1.5px solid var(--g3);background:var(--g4);cursor:pointer;text-align:center;transition:all .15s;font-family:inherit}.dp-btn:hover{border-color:var(--pri);background:rgba(0,122,255,.06)}
+.dutch-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--g4);margin-bottom:6px}
+.dutch-row .name{flex:1;font-size:14px;font-weight:500}.dutch-row .amount{font-size:16px;font-weight:700;color:var(--pri)}
+.check-btn{width:24px;height:24px;border-radius:7px;border:2px solid var(--g3);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s}.check-btn.on{border-color:var(--pri);background:var(--pri);color:#fff}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1D1D1F;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:9999;animation:tin .3s ease-out;box-shadow:0 4px 20px rgba(0,0,0,.2);max-width:90vw;text-align:center}
+@keyframes tin{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ═══ 카드 뽑기 ═══ */
+.lottery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;perspective:800px}
+.lottery-card{height:56px;cursor:default;perspective:600px}
+.card-inner{position:relative;width:100%;height:100%;transition:transform .5s ease;transform-style:preserve-3d}
+.card-inner.flipped{transform:rotateY(180deg)}
+.card-front,.card-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.card-front{background:var(--g4);border:1.5px solid var(--g3);color:var(--tx)}
+.card-back{background:linear-gradient(135deg,#667eea,#764ba2);border:1.5px solid #5a67d8;color:rgba(255,255,255,.6);transform:rotateY(180deg);font-size:22px;font-weight:800}
+.card-inner.winner .card-front{background:linear-gradient(135deg,#FFD700,#FFA500);border-color:#FFB800;color:#fff;animation:winPulse 1s ease infinite;font-size:15px;font-weight:700}
+@keyframes winPulse{0%,100%{box-shadow:0 0 10px rgba(255,165,0,.3)}50%{box-shadow:0 0 25px rgba(255,165,0,.6)}}
+.card-inner.eliminated{opacity:.3;transform:scale(.9)}
+.lottery-result{text-align:center;padding:24px 20px;background:linear-gradient(135deg,#FFF3CD,#FFE5A0);border-radius:var(--r);margin-top:16px;animation:pop .4s ease-out}
+@keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+.shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-1deg)}40%{transform:translateX(4px) rotate(1deg)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+/* 콘페티 */
+.confetti-container{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;overflow:hidden}
+.confetti-piece{position:absolute;width:10px;height:10px;top:-20px;animation:confettiFall 3s ease-in forwards}
+@keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+/* 이스터에그: 파티모드 */
+.party-mode{animation:rainbow 2s linear}
+@keyframes rainbow{0%{filter:hue-rotate(0deg)}50%{filter:hue-rotate(180deg)}100%{filter:hue-rotate(360deg)}}
+
+@media(max-width:500px){.ttl{font-size:22px}.tg{grid-template-columns:1fr}.msd-n{font-size:12px}.mt>button{padding:10px 12px;font-size:12px}.dp-grid,.lottery-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useMemo,useRef,useEffect,useCallback}=React;
+
+const SK_L=["","입문","초급","중급","상급","고수"];
+const SK_C=["","#34C759","#007AFF","#FF9500","#FF3B30","#AF52DE"];
+const GEN_C={M:"#5AC8FA",F:"#FF2D55"};const GEN_L={M:"남",F:"여"};
+const COURT_C=["#007AFF","#FF9500","#34C759","#AF52DE"];
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]]}return b}
+function balanced2(ps){const s=[...ps].sort((a,b)=>b.skill-a.skill);const t=[];let lo=0,hi=s.length-1;while(lo<hi){t.push({players:[s[lo],s[hi]]});lo++;hi--}return t}
+function random2(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-1;i+=2)t.push({players:[s[i],s[i+1]]});return t}
+function balanced3(ps){const s=[...ps].sort((a,b)=>b.skill-a.skill);const n=Math.floor(s.length/3);const t=Array.from({length:n},()=>({players:[]}));let d=1,idx=0;for(const p of s){if(idx>=0&&idx<n)t[idx].players.push(p);idx+=d;if(idx>=n||idx<0){d*=-1;idx+=d}}return t.filter(x=>x.players.length>=2)}
+function random3(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-2;i+=3)t.push({players:[s[i],s[i+1],s[i+2]]});return t}
+function mixedPair(ps,mode){const ms=ps.filter(p=>p.gender==="M"),fs=ps.filter(p=>p.gender==="F"),us=ps.filter(p=>!p.gender);const t=[];let mL=mode==="balanced"?[...ms].sort((a,b)=>b.skill-a.skill):shuffle(ms);let fL=mode==="balanced"?[...fs].sort((a,b)=>a.skill-b.skill):shuffle(fs);const n=Math.min(mL.length,fL.length);for(let i=0;i<n;i++)t.push({players:[mL[i],fL[i]]});const rem=[...mL.slice(n),...fL.slice(n),...us];if(rem.length>=2)t.push(...(mode==="balanced"?balanced2(rem):random2(rem)));return t}
+function sharePlayer(t1,t2){if(t1.bye||t2.bye||t1.ph||t2.ph)return false;const s=new Set((t1.players||[]).map(p=>p.id));return(t2.players||[]).some(p=>s.has(p.id))}
+function tn(t){if(t.bye)return"부전승";if(t.ph)return t.name;return(t.players||[]).map(p=>p.name).join(" · ")}
+function tsk(t){return(t.bye||t.ph)?null:(t.players||[]).reduce((s,p)=>s+p.skill,0)}
+function tid(t){return t.bye?"bye":t.ph?t.name:(t.players||[]).map(p=>p.id).sort((a,b)=>a-b).join("-")}
+function genRR(teams){const r=[];const l=[...teams];if(l.length%2)l.push({bye:true});const n=l.length;for(let i=0;i<n-1;i++){const m=[];for(let j=0;j<n/2;j++){const a=l[j],b=l[n-1-j];if(!a.bye&&!b.bye&&!sharePlayer(a,b))m.push({team1:a,team2:b,s1:"",s2:""})}if(m.length)r.push({round:i+1,matches:m});const last=l.pop();l.splice(1,0,last)}return r}
+function genT(teams){let sz=1;while(sz<teams.length)sz*=2;const br=[...teams];while(br.length<sz)br.push({bye:true});const s=shuffle(br);const r=[];let c=s;let rn=1;while(c.length>1){const m=[];for(let i=0;i<c.length;i+=2)m.push({team1:c[i],team2:c[i+1],s1:"",s2:""});const lb=c.length===2?"결승":c.length===4?"준결승":c.length===8?"8강":c.length+"팀";r.push({round:rn,matches:m,label:lb});c=m.map((_,i)=>({ph:true,name:"R"+rn+"W"+(i+1)}));rn++}return r}
+function assignCourts(matches,cc){if(cc<=1)return matches;return matches.map(r=>({...r,matches:r.matches.map((m,i)=>({...m,court:(i%cc)+1}))}))}
+
+/* ═══ 인쇄 ═══ */
+function printSheet(allTeams,matches,mt,dualInfo){
+  const d=new Date();const ds=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
+  const real=allTeams.filter(t=>!t.bye&&!t.ph);
+  let p=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>대진표</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;padding:28px;color:#000;font-size:13px}
+h1{font-size:22px;text-align:center;margin-bottom:4px}.dt{text-align:center;color:#666;margin-bottom:24px;font-size:12px}
+h2{font-size:15px;margin:24px 0 10px;border-bottom:2px solid #333;padding-bottom:5px;page-break-after:avoid}
+h3{font-size:13px;margin:16px 0 8px;color:#444;page-break-after:avoid}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;page-break-inside:avoid}
+th,td{border:1px solid #999;padding:8px 10px;text-align:center}th{background:#f0f0f0;font-weight:600;font-size:12px}
+.ec{height:36px}.info{background:#FFF8F0;border:1px solid #FFD699;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:12px}
+.tgr{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:16px;page-break-inside:avoid}
+.tb{border:1px solid #ccc;border-radius:6px;padding:10px 12px}.tb.bonus{border:1.5px dashed #FF9500;background:#FFFBF5}
+.tl{font-weight:700;color:#007AFF;font-size:11px;margin-bottom:4px}.tp{font-size:13px}.ts{font-size:11px;color:#888;margin-top:2px}
+.ft{margin-top:40px;text-align:center;font-size:10px;color:#aaa}
+@media print{body{padding:16px}@page{margin:12mm}}</style></head><body>`;
+  p+=`<h1>🏸 와일드콕 대진표</h1><p class="dt">${ds}</p>`;
+  if(dualInfo)p+=`<div class="info">👥 듀얼: <strong>${dualInfo.dual.name}</strong> → ${dualInfo.extra.name} 와일드카드 팀 (양쪽 출전)</div>`;
+  p+=`<h2>조 편성 (${real.length}개 조)</h2><div class="tgr">`;
+  real.forEach((t,i)=>{const nm=(t.players||[]).map(x=>x.name).join(" · ");const sk=(t.players||[]).reduce((s,x)=>s+x.skill,0);p+=`<div class="tb${t.isBonus?' bonus':''}"><div class="tl">${t.isBonus?'와일드카드':'조 '+(i+1)}</div><div class="tp">${nm}</div><div class="ts">실력 합: ${sk}</div></div>`});
+  p+=`</div>`;
+  if(matches.length){
+    p+=`<h2>${mt==="roundrobin"?"라운드 로빈":"토너먼트"} 대진표</h2>`;
+    matches.forEach(r=>{
+      p+=`<h3>${r.label||"라운드 "+r.round} (${r.matches.length}경기)</h3>`;
+      const hasCourt=r.matches[0]?.court;
+      p+=`<table><tr><th style="width:30px">#</th>${hasCourt?'<th style="width:50px">코트</th>':''}<th>팀 A</th><th style="width:100px">스코어</th><th>팀 B</th><th style="width:80px">승자</th></tr>`;
+      r.matches.forEach((m,i)=>{p+=`<tr><td>${i+1}</td>${m.court?`<td>${m.court}</td>`:''}<td>${tn(m.team1)}</td><td class="ec"></td><td>${tn(m.team2)}</td><td class="ec"></td></tr>`});
+      p+=`</table>`;
+    });
+  }
+  p+=`<h2>📊 순위표</h2><table><tr><th style="width:40px">순위</th><th>팀명</th><th style="width:40px">승</th><th style="width:40px">패</th><th style="width:50px">승점</th><th style="width:60px">득실</th></tr>`;
+  for(let i=0;i<real.length;i++)p+=`<tr><td class="ec"></td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td class="ec"></td></tr>`;
+  p+=`</table><h2>메모</h2><div style="border:1px solid #ccc;border-radius:6px;height:80px;margin-bottom:20px"></div><div class="ft">와일드콕</div></body></html>`;
+  const w=window.open("","_blank");w.document.write(p);w.document.close();setTimeout(()=>w.print(),400);
+}
+
+/* ═══ 컴포넌트 ═══ */
+function Badge({level}){const c=SK_C[level];return <span className="badge" style={{color:c,background:c+"14"}}>Lv.{level} {SK_L[level]}</span>}
+function GBadge({gender}){if(!gender)return null;const c=GEN_C[gender];return <span className="badge" style={{color:c,background:c+"18",marginLeft:4}}>{GEN_L[gender]}</span>}
+function SkB({value,onChange,small}){return <div className="fg">{[1,2,3,4,5].map(v=><button key={v} className={"skb"+(small?" skb-s":"")+(value===v?" on":"")} style={value===v?{borderColor:SK_C[v],background:SK_C[v]+"14",color:SK_C[v]}:{}} onClick={()=>onChange(v)}>{v}</button>)}</div>}
+function GenB({value,onChange,small}){return <div className="fg">{["M","F"].map(g=><button key={g} className={"gb"+(small?" gb-s":"")+(value===g?" on":"")} style={value===g?{borderColor:GEN_C[g],background:GEN_C[g]+"18",color:GEN_C[g]}:{}} onClick={()=>onChange(value===g?null:g)}>{GEN_L[g]}</button>)}</div>}
+function useToast(){const[m,setM]=useState(null);const r=useRef();const show=(t,ms)=>{if(r.current)clearTimeout(r.current);setM(t);r.current=setTimeout(()=>setM(null),ms||2500)};return{show,el:m?<div className="toast">{m}</div>:null}}
+
+/* ═══ 콘페티 ═══ */
+function Confetti({active}){
+  if(!active)return null;
+  const colors=["#FF3B30","#FF9500","#FFD700","#34C759","#007AFF","#AF52DE","#FF2D55"];
+  const pieces=Array.from({length:60},(_,i)=>({
+    id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],
+    size:6+Math.random()*8,shape:Math.random()>.5?"50%":"0"
+  }));
+  return <div className="confetti-container">{pieces.map(p=>
+    <div key={p.id} className="confetti-piece" style={{
+      left:p.left+"%",animationDelay:p.delay+"s",
+      width:p.size,height:p.size,borderRadius:p.shape,
+      background:p.color
+    }} />
+  )}</div>;
+}
+
+/* ═══ 카드 뽑기 (랜덤뽑기)_ ═══ */
+function CardLottery({pool,count}){
+  // phase: idle → flipDown → shake → reveal → done
+  const[phase,setPhase]=useState("idle");
+  const[cards,setCards]=useState([]);
+  const[winners,setWinners]=useState([]);
+  const timerRef=useRef([]);
+
+  const reset=()=>{
+    timerRef.current.forEach(t=>clearTimeout(t));
+    timerRef.current=[];
+    setCards(pool.map(n=>({name:n,state:"up"})));
+    setPhase("idle");
+    setWinners([]);
+  };
+
+  useEffect(()=>{reset()},[pool.join(","),count]);
+  useEffect(()=>()=>timerRef.current.forEach(t=>clearTimeout(t)),[]);
+
+  const start=()=>{
+    if(pool.length===0)return;
+    const cnt=Math.min(count,pool.length);
+    // 1: 모두 뒤집기
+    setPhase("flipDown");
+    setCards(pool.map(n=>({name:n,state:"down"})));
+    setWinners([]);
+    // 2: 흔들기
+    timerRef.current.push(setTimeout(()=>{setPhase("shake")},600));
+    // 3: 당첨자 선정 + 순차 공개
+    const picked=shuffle([...pool]).slice(0,cnt);
+    timerRef.current.push(setTimeout(()=>{
+      setPhase("reveal");
+      picked.forEach((winner,idx)=>{
+        timerRef.current.push(setTimeout(()=>{
+          setCards(prev=>prev.map(c=>c.name===winner?{...c,state:"winner"}:c));
+          setWinners(prev=>[...prev,winner]);
+        },idx*500+100));
+      });
+      // 4: 탈락자 표시
+      timerRef.current.push(setTimeout(()=>{
+        setCards(prev=>prev.map(c=>c.state==="down"?{...c,state:"eliminated"}:c));
+        setPhase("done");
+      },cnt*500+400));
+    },1400));
+  };
+
+  return (
+    <div>
+      <div className="cd">
+        <p className="sl">🎴 카드 뽑기</p>
+        <p className="hint">카드를 뒤집어 {count}명을 뽑습니다. ({pool.length}명 참가)</p>
+        <div className={"lottery-grid"+(phase==="shake"?" shake":"")}>
+          {cards.map((c,i)=>(
+            <div key={i} className="lottery-card">
+              <div className={"card-inner"+(c.state==="down"||c.state==="eliminated"?" flipped":"")+(c.state==="winner"?" winner":"")+(c.state==="eliminated"?" eliminated":"")}
+                style={{transitionDelay:(phase==="flipDown"?i*30:0)+"ms"}}>
+                <div className="card-front">{c.name}</div>
+                <div className="card-back">?</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {winners.length>0&&phase==="done"&&(
+        <div className="lottery-result">
+          <div style={{fontSize:14,fontWeight:600,color:"var(--orange)",marginBottom:8}}>🎉 당첨!</div>
+          <div style={{fontSize:28,fontWeight:800}}>{winners.join(", ")}</div>
+        </div>
+      )}
+      <div className="cd" style={{padding:14}}>
+        <div className="fg" style={{justifyContent:"center",gap:12}}>
+          <button className="btn bp bf" onClick={start} disabled={phase!=="idle"&&phase!=="done"} style={{fontSize:16,padding:14,maxWidth:300}}>
+            {phase==="idle"||phase==="done"?"🎴 뽑기!":"뽑는 중..."}
+          </button>
+          {phase==="done"&&<button className="btn bs" onClick={reset} style={{padding:"14px 20px"}}>↺ 리셋</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ 더치페이 ═══ */
+function DutchPayTab({players}){
+  const[total,setTotal]=useState("");
+  const[people,setPeople]=useState([]);
+  const[customName,setCustomName]=useState("");
+  const[src,setSrc]=useState("players");
+  useEffect(()=>{if(src==="players")setPeople(players.map(p=>({name:p.name,active:true})))},[src,players]);
+  const addC=()=>{const n=customName.trim();if(!n)return;setPeople(p=>[...p,{name:n,active:true}]);setCustomName("")};
+  const toggle=i=>setPeople(p=>p.map((x,j)=>j===i?{...x,active:!x.active}:x));
+  const ac=people.filter(p=>p.active).length;
+  const tn=parseInt(total)||0;
+  const pp=ac>0?Math.ceil(tn/ac):0;
+  return (
+    <div>
+      <div className="cd">
+        <p className="sl">참가자</p>
+        <div className="fg" style={{marginBottom:12}}>
+          <button className={"pill "+(src==="players"?"p-on":"p-off")} onClick={()=>setSrc("players")}>🏸 등록 선수</button>
+          <button className={"pill "+(src==="custom"?"p-on":"p-off")} onClick={()=>setSrc("custom")}>✏️ 직접 입력</button>
+        </div>
+        {src==="custom"&&<div className="fg" style={{marginBottom:12}}><input className="inp" placeholder="이름" value={customName} onChange={e=>setCustomName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addC()} style={{flex:1}} /><button className="btn bp" onClick={addC} style={{padding:"10px 16px"}}>추가</button></div>}
+        {people.map((p,i)=><div key={i} className="dutch-row"><button className={"check-btn"+(p.active?" on":"")} onClick={()=>toggle(i)}>{p.active?"✓":""}</button><span className="name" style={{opacity:p.active?1:.4}}>{p.name}</span>{tn>0&&p.active&&<span className="amount">₩{pp.toLocaleString()}</span>}</div>)}
+        {!people.length&&<p style={{fontSize:14,color:"var(--tx2)",padding:"16px 0",textAlign:"center"}}>참가자 추가 필요</p>}
+      </div>
+      <div className="cd">
+        <p className="sl">총 금액</p>
+        <input className="inp" type="number" placeholder="금액 (원)" value={total} onChange={e=>setTotal(e.target.value)} style={{fontSize:20,fontWeight:700,textAlign:"center",marginBottom:16}} />
+        {tn>0&&ac>0&&<div style={{textAlign:"center",padding:"20px 0",background:"var(--g4)",borderRadius:12}}>
+          <p style={{fontSize:13,color:"var(--tx2)",marginBottom:6}}>1인당 ({ac}명)</p>
+          <p style={{fontSize:32,fontWeight:800,color:"var(--pri)"}}>₩{pp.toLocaleString()}</p>
+          {tn%ac!==0&&<p style={{fontSize:12,color:"var(--orange)",marginTop:6}}>* 올림 (차액 ₩{(pp*ac-tn).toLocaleString()})</p>}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/*  메인 앱                                 */
+/* ═══════════════════════════════════════ */
+function App(){
+  const toast=useToast();
+  const[mainTab,setMainTab]=useState("badminton");
+  const[subTab,setSubTab]=useState("players");
+  const[players,setPlayers]=useState(()=>{try{const s=localStorage.getItem("bp");if(!s)return[];return JSON.parse(s).map(x=>({...x,gender:x.gender||null}))}catch{return[]}});
+  const[nn,setNn]=useState("");const[ns,setNs]=useState(3);const[ng,setNg]=useState(null);
+  const[teams,setTeams]=useState([]);const[extraPlayer,setExtraPlayer]=useState(null);const[dualPartner,setDualPartner]=useState(null);
+  const[pm,setPm]=useState("random");const[mixed,setMixed]=useState(false);const[teamSize,setTeamSize]=useState(2);
+  const[mt,setMt]=useState("roundrobin");const[courtCount,setCourtCount]=useState(1);
+  const[matches,setMatches]=useState([]);
+  const[eid,setEid]=useState(null);const[en,setEn]=useState("");const[esk,setEsk]=useState(3);const[eg,setEg]=useState(null);
+  const[rNames,setRN]=useState("");const[rCnt,setRC]=useState(1);const[rSrc,setRS]=useState("custom");
+  const[confetti,setConfetti]=useState(false);
+  // 이스터에그: 코나미코드
+  const konamiRef=useRef([]);
+  const logoClickRef=useRef(0);
+  const KONAMI="r,e,s,p,o,n,s,e";
+
+  useEffect(()=>{
+    const handler=e=>{
+      konamiRef.current.push(e.key);if(konamiRef.current.length>10)konamiRef.current.shift();
+      if(konamiRef.current.join(",")===KONAMI){
+        setConfetti(true);toast.show(" 즐거웠어 대응팀.. 또 볼 수 있길! 🤞",3000);
+        document.body.classList.add("party-mode");
+        setTimeout(()=>{setConfetti(false);document.body.classList.remove("party-mode")},3000);
+        konamiRef.current=[];
+      }
+    };
+    window.addEventListener("keydown",handler);return()=>window.removeEventListener("keydown",handler);
+  },[]);
+
+  const onLogoClick=()=>{
+    logoClickRef.current++;
+    if(logoClickRef.current>=7){
+      logoClickRef.current=0;
+      setConfetti(true);toast.show("🏸💕사랑해요 와일드콕!",2000);
+      setTimeout(()=>setConfetti(false),3000);
+    }
+  };
+
+  useEffect(()=>{try{localStorage.setItem("bp",JSON.stringify(players))}catch{}},[players]);
+  const nid=useMemo(()=>Math.max(0,...players.map(p=>p.id))+1,[players]);
+  const allTeams=useMemo(()=>{if(!extraPlayer||!dualPartner)return teams;return[...teams,{players:[extraPlayer,dualPartner],isBonus:true}]},[teams,extraPlayer,dualPartner]);
+
+  const warnReset=()=>{if(teams.length>0){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);toast.show("초기화됨")}return true};
+  const addP=()=>{const name=nn.trim();if(!name)return;if(players.some(p=>p.name===name)){toast.show("⚠️ 이미 등록됨");return}if(!warnReset())return;setPlayers(p=>[...p,{id:nid,name,skill:ns,gender:ng}]);setNn("");setNs(3);setNg(null);toast.show("✅ "+name)};
+  const delP=id=>{if(!warnReset())return;setPlayers(p=>p.filter(x=>x.id!==id))};
+  const startE=p=>{setEid(p.id);setEn(p.name);setEsk(p.skill);setEg(p.gender)};
+  const saveE=()=>{if(!warnReset()){setEid(null);return}setPlayers(p=>p.map(x=>x.id===eid?{...x,name:en,skill:esk,gender:eg}:x));setEid(null)};
+
+  const doTeams=()=>{
+    const minP=teamSize===3?6:4;if(players.length<minP)return;
+    let act=[...players],extra=null;const rem=act.length%teamSize;
+    if(rem>0){
+      if(rem===1){const i=0|Math.random()*act.length;extra=act[i];act=act.filter((_,j)=>j!==i)}
+      else if(rem===2&&teamSize===3){const sh=shuffle(act);const pair=sh.slice(-2);act=sh.slice(0,-2);let result=pm==="balanced"?balanced3(act):random3(act);result.push({players:pair,isSmall:true});setTeams(result);setExtraPlayer(null);setDualPartner(null);setMatches([]);setSubTab("teams");return}
+    }
+    let result;
+    if(mixed&&teamSize===2)result=mixedPair(act,pm);
+    else if(teamSize===3)result=pm==="balanced"?balanced3(act):random3(act);
+    else result=pm==="balanced"?balanced2(act):random2(act);
+    if(act.every(p=>p.skill===act[0].skill)&&pm==="balanced")toast.show("ℹ️ 실력 동일 — 무작위 동일");
+    if(mixed&&teamSize===3)toast.show("ℹ️ 혼성은 2인 조 전용");
+    setTeams(result);setExtraPlayer(extra);setDualPartner(null);setMatches([]);setSubTab("teams");
+  };
+
+  const doMatches=()=>{if(allTeams.length<2)return;setMatches(assignCourts(mt==="roundrobin"?genRR(allTeams):genT(allTeams),courtCount));setSubTab("matches")};
+  const setScore=(ri,mi,side,v)=>{const num=v.replace(/[^0-9]/g,"");setMatches(p=>{const n=JSON.parse(JSON.stringify(p));if(side===1)n[ri].matches[mi].s1=num;else n[ri].matches[mi].s2=num;return n})};
+
+  const records=useMemo(()=>{
+    if(!allTeams.length||!matches.length)return[];
+    const m={};allTeams.forEach(t=>{if(!t.bye&&!t.ph)m[tid(t)]={name:tn(t),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:!!t.isBonus}});
+    matches.forEach(r=>r.matches.forEach(x=>{const a=parseInt(x.s1),b=parseInt(x.s2);if(isNaN(a)||isNaN(b))return;const k1=tid(x.team1),k2=tid(x.team2);if(!m[k1]||!m[k2])return;m[k1].pf+=a;m[k1].pa+=b;m[k2].pf+=b;m[k2].pa+=a;if(a>b){m[k1].w++;m[k1].pts++;m[k2].l++;m[k1].h2h[k2]=(m[k1].h2h[k2]||0)+1}else if(b>a){m[k2].w++;m[k2].pts++;m[k1].l++;m[k2].h2h[k1]=(m[k2].h2h[k1]||0)+1}else{m[k1].d++;m[k2].d++}}));
+    const arr=Object.entries(m).map(([k,v])=>({...v,key:k}));
+    arr.sort((a,b)=>{if(b.pts!==a.pts)return b.pts-a.pts;const aw=a.h2h[b.key]||0,bw=b.h2h[a.key]||0;if(aw!==bw)return bw-aw;return(b.pf-b.pa)-(a.pf-a.pa)});
+    return arr;
+  },[allTeams,matches]);
+
+  const dualInfo=extraPlayer&&dualPartner?{extra:extraPlayer,dual:dualPartner}:null;
+  const canGenMatch=extraPlayer?(!!dualPartner&&allTeams.length>=2):teams.length>=2;
+  const minPlayers=teamSize===3?6:4;
+  const getRP=()=>rSrc==="players"?players.map(p=>p.name):rNames.split("\n").map(s=>s.trim()).filter(Boolean);
+  const rPool=getRP();
+
+  return (
+    <div>
+      {toast.el}
+      <Confetti active={confetti} />
+
+      <header className="hdr no-print">
+        <div className="hdr-in">
+          <div className="ttl"><span onClick={onLogoClick} style={{cursor:"pointer"}}>🏸</span> 와일드콕</div>
+          <div className="mt">
+            <button className={mainTab==="badminton"?"on":""} onClick={()=>setMainTab("badminton")}>🏸 배드민턴</button>
+            <button className={mainTab==="roulette"?"on":""} onClick={()=>setMainTab("roulette")}>🎴 랜덤뽑기</button>
+            <button className={mainTab==="dutch"?"on":""} onClick={()=>setMainTab("dutch")}>💰 더치페이</button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mn">
+
+      {mainTab==="badminton"&&<div>
+        <div className="cd no-print" style={{padding:0,marginBottom:18,overflow:"hidden"}}>
+          <div className="st">
+            <button className={subTab==="players"?"on":""} onClick={()=>setSubTab("players")}>선수 ({players.length})</button>
+            <button className={subTab==="teams"?"on":""} onClick={()=>setSubTab("teams")}>조 편성{teams.length?` (${allTeams.filter(t=>!t.bye&&!t.ph).length})`:""}</button>
+            <button className={subTab==="matches"?"on":""} onClick={()=>setSubTab("matches")}>매치{matches.length?` (${matches.reduce((a,r)=>a+r.matches.length,0)})`:""}</button>
+          </div>
+        </div>
+
+        {subTab==="players"&&<div>
+          <div className="cd">
+            <p className="sl">선수 추가</p>
+            <div className="fg fw" style={{alignItems:"flex-end",gap:10}}>
+              <div style={{flex:1,minWidth:120}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:5}}>이름</label><input className="inp" placeholder="이름" value={nn} onChange={e=>setNn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addP()} /></div>
+              <div><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:5}}>실력 — <span style={{color:SK_C[ns],fontWeight:700}}>{SK_L[ns]}</span></label><SkB value={ns} onChange={setNs} /></div>
+              <div><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:5}}>성별</label><GenB value={ng} onChange={setNg} /></div>
+              <button className="btn bp" onClick={addP} style={{height:42}}>추가</button>
+            </div>
+          </div>
+          <div className="cd">
+            <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>선수 목록</p><span style={{fontSize:13,color:"var(--tx2)",fontWeight:500}}>{players.length}명</span></div>
+            {!players.length?<div className="es"><div className="es-i">👤</div><div className="es-t">선수를 추가해주세요</div><div className="es-s">최소 {minPlayers}명</div></div>:
+            players.map((p,i)=><div key={p.id} className="ri">
+              {eid===p.id?<>
+                <input className="inp" value={en} onChange={e=>setEn(e.target.value)} style={{flex:1,padding:"7px 10px",fontSize:14,background:"#fff"}} autoFocus onKeyDown={e=>{if(e.key==="Enter")saveE();if(e.key==="Escape")setEid(null)}} />
+                <SkB value={esk} onChange={setEsk} small /><GenB value={eg} onChange={setEg} small />
+                <button className="btn bs" onClick={saveE} style={{padding:"5px 12px",fontSize:12}}>저장</button>
+                <button className="btn bd" onClick={()=>setEid(null)} style={{padding:"5px 8px",fontSize:12}}>취소</button>
+              </>:<>
+                <span style={{fontSize:12,color:"var(--tx2)",fontWeight:500,width:20,textAlign:"center"}}>{i+1}</span>
+                <span style={{flex:1,fontSize:14,fontWeight:500}}>{p.name}</span>
+                <GBadge gender={p.gender} /><Badge level={p.skill} />
+                <button className="btn bs" onClick={()=>startE(p)} style={{padding:"4px 10px",fontSize:11}}>수정</button>
+                <button className="btn bd" onClick={()=>delP(p.id)} style={{padding:"4px 8px",fontSize:13}}>✕</button>
+              </>}
+            </div>)}
+          </div>
+          <div className="cd">
+            <p className="sl">조 편성</p>
+            <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>팀 인원</label><div className="fg"><button className={"pill "+(teamSize===2?"p-on":"p-off")} onClick={()=>setTeamSize(2)}>2인</button><button className={"pill "+(teamSize===3?"p-on":"p-off")} onClick={()=>setTeamSize(3)}>3인</button></div></div>
+            <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>방식</label><div className="fg fw"><button className={"pill "+(pm==="random"?"p-on":"p-off")} onClick={()=>setPm("random")}>🎲 무작위</button><button className={"pill "+(pm==="balanced"?"p-on":"p-off")} onClick={()=>setPm("balanced")}>⚖️ 밸런스</button>{teamSize===2&&<button className={"pill "+(mixed?"p-on":"p-off")} onClick={()=>setMixed(!mixed)} style={mixed?{background:"var(--pink)"}:{}}>👫 혼성</button>}</div></div>
+            <button className="btn bp bf" onClick={doTeams} disabled={players.length<minPlayers}>{players.length<minPlayers?`최소 ${minPlayers}명 (${players.length}명)`:"조 편성하기"}</button>
+          </div>
+        </div>}
+
+        {subTab==="teams"&&<div>
+          {!teams.length?<div className="cd es"><div className="es-i">🏸</div><div className="es-t">편성된 조 없음</div></div>:<>
+            {extraPlayer&&<div className="cd bye-b">
+              <div className="fg" style={{marginBottom:dualPartner?0:12}}>
+                <span style={{fontSize:20}}>👤</span>
+                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"var(--orange)"}}>홀수 — 듀얼 파트너 선택</div><div style={{fontSize:15,fontWeight:600,marginTop:2}}>{extraPlayer.name}</div></div>
+                <Badge level={extraPlayer.skill} /><GBadge gender={extraPlayer.gender} />
+              </div>
+              {!dualPartner&&<><p style={{fontSize:13,color:"var(--tx2)",margin:"10px 0 6px",lineHeight:1.5}}>파트너는 양쪽 팀 모두 출전합니다.</p>
+                <div className="dp-grid">{teams.flatMap(t=>(t.players||[]).map(p=><button key={p.id} className="dp-btn" onClick={()=>{setDualPartner(p);toast.show("👥 "+p.name+" 듀얼")}}><div style={{fontSize:14,fontWeight:600}}>{p.name}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>Lv.{p.skill}</div></button>))}</div></>}
+              {dualPartner&&<div style={{marginTop:12,padding:"10px 14px",background:"rgba(255,149,0,.08)",borderRadius:10}}><div className="fg"><span style={{fontSize:13,fontWeight:600,color:"var(--orange)"}}>✅</span><span style={{fontSize:14,fontWeight:600}}>{dualPartner.name}</span><span className="dual-tag">양쪽</span><button className="btn bs" onClick={()=>setDualPartner(null)} style={{marginLeft:"auto",padding:"4px 10px",fontSize:11}}>변경</button></div></div>}
+            </div>}
+            <div className="cd">
+              <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>{allTeams.filter(t=>!t.bye&&!t.ph).length}개 조</p><button className="btn bs" onClick={doTeams}>🔄 다시</button></div>
+              <div className="tg">{allTeams.filter(t=>!t.bye&&!t.ph).map((t,i)=><div key={i} className={"tc"+(t.isBonus?" bonus":"")}>
+                <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:700,color:t.isBonus?"var(--orange)":t.isSmall?"var(--purple)":"var(--pri)"}}>{t.isBonus?"와일드카드":t.isSmall?"소수조":"조 "+(i+1)}</span><span style={{fontSize:11,fontWeight:600,color:"var(--tx2)",background:"#fff",padding:"2px 7px",borderRadius:5}}>합 {tsk(t)}</span></div>
+                {(t.players||[]).map((p,j)=>{const isDual=dualPartner&&p.id===dualPartner.id;return <div key={j} className="fb" style={{marginTop:4}}><span style={{fontSize:14,fontWeight:500}}>{p.name}{isDual&&<span className="dual-tag">듀얼</span>}</span><span className="fg"><GBadge gender={p.gender} /><Badge level={p.skill} /></span></div>})}
+              </div>)}</div>
+            </div>
+            <div className="cd">
+              <p className="sl">매치 생성</p>
+              <div className="fg fw" style={{marginBottom:12}}><button className={"pill "+(mt==="roundrobin"?"p-on":"p-off")} onClick={()=>setMt("roundrobin")}>🔁 라운드 로빈</button><button className={"pill "+(mt==="tournament"?"p-on":"p-off")} onClick={()=>setMt("tournament")}>🏆 토너먼트</button></div>
+              <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>코트 수</label><div className="fg">{[1,2,3,4].map(n=><button key={n} className={"pill "+(courtCount===n?"p-on":"p-off")} onClick={()=>setCourtCount(n)}>{n}면</button>)}</div></div>
+              {extraPlayer&&!dualPartner&&<p style={{fontSize:13,color:"var(--danger)",fontWeight:600,marginBottom:12}}>⚠️ 듀얼 파트너 먼저 선택</p>}
+              <button className="btn bgn bf" onClick={doMatches} disabled={!canGenMatch}>매치 생성</button>
+            </div>
+          </>}
+        </div>}
+
+        {subTab==="matches"&&<div>
+          {!matches.length?<div className="cd es"><div className="es-i">📋</div><div className="es-t">매치 없음</div></div>:<>
+            <div className="fb no-print" style={{marginBottom:14}}>
+              <div style={{fontSize:18,fontWeight:700}}>{mt==="roundrobin"?"라운드 로빈":"토너먼트"}</div>
+              <div className="fg"><button className="btn bs" onClick={()=>printSheet(allTeams,matches,mt,dualInfo)}>🖨️</button><button className="btn bs" onClick={doMatches}>🔄</button></div>
+            </div>
+            {matches.map((rd,ri)=><div key={ri} className="cd">
+              <div className="sl fg"><span style={{color:rd.label?"var(--purple)":undefined}}>{rd.label||("라운드 "+rd.round)}</span><span style={{fontSize:11,color:"var(--tx2)",fontWeight:500,background:"var(--g4)",padding:"2px 7px",borderRadius:5,textTransform:"none",letterSpacing:0}}>{rd.matches.length}경기</span></div>
+              {rd.matches.map((m,mi)=>{const a=parseInt(m.s1),b=parseInt(m.s2),ok=!isNaN(a)&&!isNaN(b);const w1=ok&&a>b,w2=ok&&b>a;
+                return <div key={mi}>{m.court&&<span className="court-tag" style={{background:COURT_C[(m.court-1)%4]}}>코트 {m.court}</span>}<div className="mr">
+                  <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{tn(m.team1)}{m.team1.isBonus&&<span className="dual-tag" style={{marginLeft:4}}>와일드카드</span>}</div>{tsk(m.team1)!=null&&<div className="msd-s">합 {tsk(m.team1)}</div>}{w1&&<span className="wt">WIN</span>}</div>
+                  <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><input className="si" value={m.s1} onChange={e=>setScore(ri,mi,1,e.target.value)} placeholder="-" maxLength="3" /><span className="sc">:</span><input className="si" value={m.s2} onChange={e=>setScore(ri,mi,2,e.target.value)} placeholder="-" maxLength="3" /></div>
+                  <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{tn(m.team2)}{m.team2.isBonus&&<span className="dual-tag" style={{marginLeft:4}}>와일드카드</span>}</div>{tsk(m.team2)!=null&&<div className="msd-s">합 {tsk(m.team2)}</div>}{w2&&<span className="wt">WIN</span>}</div>
+                </div></div>})}
+            </div>)}
+            {records.some(r=>r.w+r.l+r.d>0)&&<div className="cd">
+              <p className="sl">📊 순위표</p><p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>승리 +1점 · 동률: 승자승 → 득실차</p>
+              {records.map((r,i)=>{const tot=r.w+r.l+r.d;const pct=tot?Math.round(r.w/tot*100):0;
+                return <div key={i} className="rr"><span style={{fontSize:15,fontWeight:800,color:i===0?"var(--orange)":i<3?"var(--pri)":"var(--g1)",width:26,textAlign:"center"}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontSize:14,fontWeight:600,minWidth:90,flex:"0 0 auto"}}>{r.name}{r.isBonus&&<span className="dual-tag" style={{marginLeft:4}}>와일드카드</span>}</span><span style={{fontSize:12,color:"var(--tx2)",minWidth:55}}>{r.w}승 {r.l}패</span><span style={{fontSize:13,fontWeight:700,color:"var(--pri)",minWidth:30}}>{r.pts}점</span><div className="rb"><div className="rf" style={{width:pct+"%"}} /></div><span style={{fontSize:12,color:"var(--tx2)",minWidth:50,textAlign:"right"}}>{r.pf}-{r.pa}</span></div>})}
+            </div>}
+          </>}
+        </div>}
+      </div>}
+
+      {mainTab==="roulette"&&<div>
+        <div className="cd">
+          <p className="sl">대상자</p>
+          <div className="fg" style={{marginBottom:12}}><button className={"pill "+(rSrc==="players"?"p-on":"p-off")} onClick={()=>setRS("players")}>🏸 등록 선수</button><button className={"pill "+(rSrc==="custom"?"p-on":"p-off")} onClick={()=>setRS("custom")}>✏️ 직접 입력</button></div>
+          {rSrc==="custom"?<textarea className="inp" rows={5} placeholder={"한 줄에 하나씩\n김철수\n이영희"} value={rNames} onChange={e=>setRN(e.target.value)} style={{resize:"vertical",lineHeight:1.6}} />
+          :<div style={{fontSize:14,color:"var(--tx2)",padding:"10px 0"}}>{players.length?`${players.length}명: ${players.map(p=>p.name).join(", ")}`:"선수 없음"}</div>}
+        </div>
+        <div className="cd"><p className="sl">뽑기 설정</p><div className="fg" style={{marginBottom:12}}><label style={{fontSize:14,fontWeight:500}}>인원:</label><select className="inp" value={rCnt} onChange={e=>setRC(+e.target.value)} style={{width:70,padding:"8px 10px",textAlign:"center"}}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}명</option>)}</select></div></div>
+        {rPool.length>0?<CardLottery pool={rPool} count={rCnt} />:<div className="cd es"><div className="es-i">🎴</div><div className="es-t">대상자를 추가해주세요</div></div>}
+      </div>}
+
+      {mainTab==="dutch"&&<DutchPayTab players={players} />}
+
+      </main>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
