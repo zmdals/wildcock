@@ -107,11 +107,11 @@ const GEN_C={M:"#5AC8FA",F:"#FF2D55"};const GEN_L={M:"남",F:"여"};
 const COURT_C=["#007AFF","#FF9500","#34C759","#AF52DE"];
 
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]]}return b}
-function balanced2(ps){const s=[...ps].sort((a,b)=>b.skill-a.skill);const t=[];let lo=0,hi=s.length-1;while(lo<hi){t.push({players:[s[lo],s[hi]]});lo++;hi--}return t}
+function balanced2(ps){const s=shuffle([...ps]).sort((a,b)=>b.skill-a.skill);const t=[];let lo=0,hi=s.length-1;while(lo<hi){t.push({players:[s[lo],s[hi]]});lo++;hi--}return t}
 function random2(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-1;i+=2)t.push({players:[s[i],s[i+1]]});return t}
-function balanced3(ps){const s=[...ps].sort((a,b)=>b.skill-a.skill);const n=Math.floor(s.length/3);const t=Array.from({length:n},()=>({players:[]}));let d=1,idx=0;for(const p of s){if(idx>=0&&idx<n)t[idx].players.push(p);idx+=d;if(idx>=n||idx<0){d*=-1;idx+=d}}return t.filter(x=>x.players.length>=2)}
+function balanced3(ps){const s=shuffle([...ps]).sort((a,b)=>b.skill-a.skill);const n=Math.floor(s.length/3);const t=Array.from({length:n},()=>({players:[]}));let d=1,idx=0;for(const p of s){if(idx>=0&&idx<n)t[idx].players.push(p);idx+=d;if(idx>=n||idx<0){d*=-1;idx+=d}}return t.filter(x=>x.players.length>=2)}
 function random3(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-2;i+=3)t.push({players:[s[i],s[i+1],s[i+2]]});return t}
-function mixedPair(ps,mode){const ms=ps.filter(p=>p.gender==="M"),fs=ps.filter(p=>p.gender==="F"),us=ps.filter(p=>!p.gender);const t=[];let mL=mode==="balanced"?[...ms].sort((a,b)=>b.skill-a.skill):shuffle(ms);let fL=mode==="balanced"?[...fs].sort((a,b)=>a.skill-b.skill):shuffle(fs);const n=Math.min(mL.length,fL.length);for(let i=0;i<n;i++)t.push({players:[mL[i],fL[i]]});const rem=[...mL.slice(n),...fL.slice(n),...us];if(rem.length>=2)t.push(...(mode==="balanced"?balanced2(rem):random2(rem)));return t}
+function mixedPair(ps,mode){const ms=ps.filter(p=>p.gender==="M"),fs=ps.filter(p=>p.gender==="F"),us=ps.filter(p=>!p.gender);const t=[];let mL=mode==="balanced"?shuffle([...ms]).sort((a,b)=>b.skill-a.skill):shuffle(ms);let fL=mode==="balanced"?shuffle([...fs]).sort((a,b)=>a.skill-b.skill):shuffle(fs);const n=Math.min(mL.length,fL.length);for(let i=0;i<n;i++)t.push({players:[mL[i],fL[i]]});const rem=[...mL.slice(n),...fL.slice(n),...us];if(rem.length>=2)t.push(...(mode==="balanced"?balanced2(rem):random2(rem)));return t}
 function sharePlayer(t1,t2){if(t1.bye||t2.bye||t1.ph||t2.ph)return false;const s=new Set((t1.players||[]).map(p=>p.id));return(t2.players||[]).some(p=>s.has(p.id))}
 function tn(t){if(t.bye)return"부전승";if(t.ph)return t.name;return(t.players||[]).map(p=>p.name).join(" · ")}
 function tsk(t){return(t.bye||t.ph)?null:(t.players||[]).reduce((s,p)=>s+p.skill,0)}
@@ -310,7 +310,7 @@ function App(){
   const[players,setPlayers]=useState(()=>{try{const s=localStorage.getItem("bp");if(!s)return[];return JSON.parse(s).map(x=>({...x,gender:x.gender||null}))}catch{return[]}});
   const[nn,setNn]=useState("");const[ns,setNs]=useState(3);const[ng,setNg]=useState(null);
   const[teams,setTeams]=useState([]);const[extraPlayer,setExtraPlayer]=useState(null);const[dualPartner,setDualPartner]=useState(null);
-  const[pm,setPm]=useState("random");const[mixed,setMixed]=useState(false);const[teamSize,setTeamSize]=useState(2);
+  const[pm,setPm]=useState("random");const[mixed,setMixed]=useState(false);const[teamSize,setTeamSize]=useState(2);const[wildcardId,setWildcardId]=useState(null);
   const[mt,setMt]=useState("roundrobin");const[courtCount,setCourtCount]=useState(1);
   const[matches,setMatches]=useState([]);
   const[eid,setEid]=useState(null);const[en,setEn]=useState("");const[esk,setEsk]=useState(3);const[eg,setEg]=useState(null);
@@ -357,7 +357,22 @@ function App(){
     const minP=teamSize===3?6:4;if(players.length<minP)return;
     let act=[...players],extra=null;const rem=act.length%teamSize;
     if(rem>0){
-      if(rem===1){const i=0|Math.random()*act.length;extra=act[i];act=act.filter((_,j)=>j!==i)}
+      if(rem===1){
+        let ep=null;
+        if(wildcardId!=null){const idx=act.findIndex(p=>p.id===wildcardId);if(idx>=0){ep=act[idx];act=act.filter((_,j)=>j!==idx)}}
+        if(!ep){
+          if(mixed&&teamSize===2){
+            const ms=act.filter(p=>p.gender==="M"),fs=act.filter(p=>p.gender==="F");
+            let pool=ms.length>fs.length?ms:fs.length>ms.length?fs:act;
+            if(pm==="balanced"){pool=shuffle([...pool]).sort((a,b)=>a.skill-b.skill);ep=pool[Math.floor(pool.length/2)]}
+            else{ep=pool[0|Math.random()*pool.length]}
+          }else if(pm==="balanced"){
+            const sorted=shuffle([...act]).sort((a,b)=>a.skill-b.skill);ep=sorted[Math.floor(sorted.length/2)]
+          }else{ep=act[0|Math.random()*act.length]}
+          act=act.filter(p=>p.id!==ep.id);
+        }
+        extra=ep;
+      }
       else if(rem===2&&teamSize===3){const sh=shuffle(act);const pair=sh.slice(-2);act=sh.slice(0,-2);let result=pm==="balanced"?balanced3(act):random3(act);result.push({players:pair,isSmall:true});setTeams(result);setExtraPlayer(null);setDualPartner(null);setMatches([]);setSubTab("teams");return}
     }
     let result;
@@ -446,6 +461,7 @@ function App(){
             <p className="sl">조 편성</p>
             <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>팀 인원</label><div className="fg"><button className={"pill "+(teamSize===2?"p-on":"p-off")} onClick={()=>setTeamSize(2)}>2인</button><button className={"pill "+(teamSize===3?"p-on":"p-off")} onClick={()=>setTeamSize(3)}>3인</button></div></div>
             <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>방식</label><div className="fg fw"><button className={"pill "+(pm==="random"?"p-on":"p-off")} onClick={()=>setPm("random")}>🎲 무작위</button><button className={"pill "+(pm==="balanced"?"p-on":"p-off")} onClick={()=>setPm("balanced")}>⚖️ 밸런스</button>{teamSize===2&&<button className={"pill "+(mixed?"p-on":"p-off")} onClick={()=>setMixed(!mixed)} style={mixed?{background:"var(--pink)"}:{}}>👫 혼성</button>}</div></div>
+            {players.length>=minPlayers&&players.length%teamSize===1&&<div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:500,display:"block",marginBottom:6}}>와일드카드 지정</label><select className="inp" value={wildcardId==null?"auto":wildcardId} onChange={e=>setWildcardId(e.target.value==="auto"?null:+e.target.value)} style={{padding:"9px 12px"}}><option value="auto">자동 {pm==="balanced"?"(밸런스 중간 실력)":"(랜덤)"}{mixed?" · 다수 성별 우선":""}</option>{players.map(p=><option key={p.id} value={p.id}>{p.name} (Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""})</option>)}</select></div>}
             <button className="btn bp bf" onClick={doTeams} disabled={players.length<minPlayers}>{players.length<minPlayers?`최소 ${minPlayers}명 (${players.length}명)`:"조 편성하기"}</button>
           </div>
         </div>}
