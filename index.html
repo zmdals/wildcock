@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>와일드콕</title>
-<link rel="icon" type="image/png" href="favicon.png">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -306,14 +305,15 @@ function DutchPayTab({players}){
 /* ═══════════════════════════════════════ */
 function App(){
   const toast=useToast();
+  const _ss=useMemo(()=>{try{return JSON.parse(localStorage.getItem("bp_session"))||{}}catch{return {}}},[]);
   const[mainTab,setMainTab]=useState("badminton");
-  const[subTab,setSubTab]=useState("players");
+  const[subTab,setSubTab]=useState(()=>_ss.subTab||"players");
   const[players,setPlayers]=useState(()=>{try{const s=localStorage.getItem("bp");if(!s)return[];return JSON.parse(s).map(x=>({...x,gender:x.gender||null}))}catch{return[]}});
   const[nn,setNn]=useState("");const[ns,setNs]=useState(3);const[ng,setNg]=useState(null);
-  const[teams,setTeams]=useState([]);const[extraPlayer,setExtraPlayer]=useState(null);const[dualPartner,setDualPartner]=useState(null);
-  const[pm,setPm]=useState("random");const[mixed,setMixed]=useState(false);const[teamSize,setTeamSize]=useState(2);const[wildcardId,setWildcardId]=useState(null);
-  const[mt,setMt]=useState("roundrobin");const[courtCount,setCourtCount]=useState(1);
-  const[matches,setMatches]=useState([]);
+  const[teams,setTeams]=useState(()=>_ss.teams||[]);const[extraPlayer,setExtraPlayer]=useState(()=>_ss.extraPlayer||null);const[dualPartner,setDualPartner]=useState(()=>_ss.dualPartner||null);
+  const[pm,setPm]=useState(()=>_ss.pm||"random");const[mixed,setMixed]=useState(()=>_ss.mixed||false);const[teamSize,setTeamSize]=useState(()=>_ss.teamSize||2);const[wildcardId,setWildcardId]=useState(()=>_ss.wildcardId!=null?_ss.wildcardId:null);
+  const[mt,setMt]=useState(()=>_ss.mt||"roundrobin");const[courtCount,setCourtCount]=useState(()=>_ss.courtCount||1);
+  const[matches,setMatches]=useState(()=>_ss.matches||[]);
   const[eid,setEid]=useState(null);const[en,setEn]=useState("");const[esk,setEsk]=useState(3);const[eg,setEg]=useState(null);
   const[rNames,setRN]=useState("");const[rCnt,setRC]=useState(1);const[rSrc,setRS]=useState("custom");
   const[confetti,setConfetti]=useState(false);
@@ -345,6 +345,7 @@ function App(){
   };
 
   useEffect(()=>{try{localStorage.setItem("bp",JSON.stringify(players))}catch{}},[players]);
+  useEffect(()=>{try{localStorage.setItem("bp_session",JSON.stringify({teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,matches,subTab}))}catch{}},[teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,matches,subTab]);
   const nid=useMemo(()=>Math.max(0,...players.map(p=>p.id))+1,[players]);
   const allTeams=useMemo(()=>{if(!extraPlayer||!dualPartner)return teams;return[...teams,{players:[extraPlayer,dualPartner],isBonus:true}]},[teams,extraPlayer,dualPartner]);
 
