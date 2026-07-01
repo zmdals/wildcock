@@ -70,21 +70,21 @@ input,button,select,textarea{font-family:inherit}
 .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1D1D1F;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:9999;animation:tin .3s ease-out;box-shadow:0 4px 20px rgba(0,0,0,.2);max-width:90vw;text-align:center}
 @keyframes tin{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-/* ═══ 카드 뽑기 ═══ */
-.lottery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;perspective:800px}
-.lottery-card{height:56px;cursor:default;perspective:600px}
-.card-inner{position:relative;width:100%;height:100%;transition:transform .5s ease;transform-style:preserve-3d}
-.card-inner.flipped{transform:rotateY(180deg)}
-.card-front,.card-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
-.card-front{background:var(--g4);border:1.5px solid var(--g3);color:var(--tx)}
-.card-back{background:linear-gradient(135deg,#667eea,#764ba2);border:1.5px solid #5a67d8;color:rgba(255,255,255,.6);transform:rotateY(180deg);font-size:22px;font-weight:800}
-.card-inner.winner .card-front{background:linear-gradient(135deg,#FFD700,#FFA500);border-color:#FFB800;color:#fff;animation:winPulse 1s ease infinite;font-size:15px;font-weight:700}
-@keyframes winPulse{0%,100%{box-shadow:0 0 10px rgba(255,165,0,.3)}50%{box-shadow:0 0 25px rgba(255,165,0,.6)}}
-.card-inner.eliminated{opacity:.3;transform:scale(.9)}
-.lottery-result{text-align:center;padding:24px 20px;background:linear-gradient(135deg,#FFF3CD,#FFE5A0);border-radius:var(--r);margin-top:16px;animation:pop .4s ease-out}
-@keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
-.shake{animation:shake .4s ease}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-1deg)}40%{transform:translateX(4px) rotate(1deg)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+/* ═══ 서바이벌 룰렛 / 스포트라이트 뽑기 ═══ */
+.virus-grid{display:grid;gap:8px}
+.virus-cell{padding:10px 6px;border-radius:12px;text-align:center;border:2px solid var(--g3);background:var(--g4);transition:all .25s ease}
+.vc-emoji{font-size:24px;margin-bottom:3px;transition:transform .15s}
+.vc-name{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.virus-cell.danger{border-color:#FF3B30;background:linear-gradient(135deg,#FFF0F0,#FFE0E0);box-shadow:0 0 16px rgba(255,59,48,.35);transform:scale(1.06)}
+.virus-cell.danger .vc-emoji{animation:bombShake .15s ease infinite alternate}
+.virus-cell.eliminated{border-color:var(--g3);background:var(--g4);opacity:.15;transform:scale(.85);transition:all .5s ease}
+.virus-cell.scanning{border-color:var(--pri);background:rgba(0,122,255,.1);box-shadow:0 0 14px rgba(0,122,255,.3);transform:scale(1.06)}
+.virus-cell.winner{border-color:#FFB800;background:linear-gradient(135deg,#FFF8E1,#FFE082);animation:winPop .5s ease-out}
+.virus-cell.winner .vc-name{color:#E65100;font-weight:700}
+.sv-status{text-align:center;padding:10px;font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:8px}
+.sv-round{display:inline-block;background:var(--g4);padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;color:var(--tx2)}
+@keyframes bombShake{0%{transform:rotate(-8deg) scale(1.1)}100%{transform:rotate(8deg) scale(1.1)}}
+@keyframes winPop{0%{transform:scale(.8)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
 
 /* 콘페티 */
 .confetti-container{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;overflow:hidden}
@@ -95,7 +95,7 @@ input,button,select,textarea{font-family:inherit}
 .party-mode{animation:rainbow 2s linear}
 @keyframes rainbow{0%{filter:hue-rotate(0deg)}50%{filter:hue-rotate(180deg)}100%{filter:hue-rotate(360deg)}}
 
-@media(max-width:500px){.ttl{font-size:22px}.tg{grid-template-columns:1fr}.msd-n{font-size:12px}.mt>button{padding:10px 12px;font-size:12px}.dp-grid,.lottery-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}}
+@media(max-width:500px){.ttl{font-size:22px}.tg{grid-template-columns:1fr}.msd-n{font-size:12px}.mt>button{padding:10px 12px;font-size:12px}.dp-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}.vc-emoji{font-size:20px}.vc-name{font-size:11px}.virus-cell{padding:8px 4px}}
 </style>
 </head>
 <body>
@@ -184,79 +184,125 @@ function Confetti({active}){
   )}</div>;
 }
 
-/* ═══ 카드 뽑기 (랜덤뽑기)_ ═══ */
-function CardLottery({pool,count}){
-  // phase: idle → flipDown → shake → reveal → done
+/* ═══ 서바이벌 룰렛 / 스포트라이트 뽑기 ═══ */
+function VirusLottery({pool,count}){
   const[phase,setPhase]=useState("idle");
-  const[cards,setCards]=useState([]);
+  const[cells,setCells]=useState([]);
   const[winners,setWinners]=useState([]);
+  const[roundInfo,setRoundInfo]=useState("");
   const timerRef=useRef([]);
+  const cols=Math.min(pool.length,Math.max(4,Math.ceil(Math.sqrt(pool.length))));
 
   const reset=()=>{
-    timerRef.current.forEach(t=>clearTimeout(t));
-    timerRef.current=[];
-    setCards(pool.map(n=>({name:n,state:"up"})));
-    setPhase("idle");
-    setWinners([]);
+    timerRef.current.forEach(t=>clearTimeout(t));timerRef.current=[];
+    setCells(pool.map(n=>({name:n,state:"alive"})));setWinners([]);setRoundInfo("");setPhase("idle");
   };
-
   useEffect(()=>{reset()},[pool.join(","),count]);
   useEffect(()=>()=>timerRef.current.forEach(t=>clearTimeout(t)),[]);
 
-  const start=()=>{
-    if(pool.length===0)return;
-    const cnt=Math.min(count,pool.length);
-    // 1: 모두 뒤집기
-    setPhase("flipDown");
-    setCards(pool.map(n=>({name:n,state:"down"})));
-    setWinners([]);
-    // 2: 흔들기
-    timerRef.current.push(setTimeout(()=>{setPhase("shake")},600));
-    // 3: 당첨자 선정 + 순차 공개
-    const picked=shuffle([...pool]).slice(0,cnt);
-    timerRef.current.push(setTimeout(()=>{
-      setPhase("reveal");
-      picked.forEach((winner,idx)=>{
-        timerRef.current.push(setTimeout(()=>{
-          setCards(prev=>prev.map(c=>c.name===winner?{...c,state:"winner"}:c));
-          setWinners(prev=>[...prev,winner]);
-        },idx*500+100));
-      });
-      // 4: 탈락자 표시
+  const startSingle=()=>{
+    setPhase("running");setCells(pool.map(n=>({name:n,state:"alive"})));setWinners([]);
+    const winIdx=Math.floor(Math.random()*pool.length);
+    const steps=15+Math.floor(Math.random()*8);let t=0;
+    for(let i=0;i<steps;i++){
+      const delay=50+i*i*2.5;t+=delay;
+      const ci=((winIdx-steps+1+i)%pool.length+pool.length)%pool.length;
       timerRef.current.push(setTimeout(()=>{
-        setCards(prev=>prev.map(c=>c.state==="down"?{...c,state:"eliminated"}:c));
-        setPhase("done");
-      },cnt*500+400));
-    },1400));
+        setCells(pool.map((n,j)=>({name:n,state:j===ci?"scanning":"alive"})));
+      },t));
+    }
+    t+=400;
+    timerRef.current.push(setTimeout(()=>{
+      setCells(pool.map((n,j)=>({name:n,state:j===winIdx?"winner":"eliminated"})));
+      setWinners([pool[winIdx]]);setPhase("done");
+    },t));
   };
 
-  return (
+  const startSurvival=()=>{
+    const cnt=Math.min(count,pool.length);
+    const elimCount=pool.length-cnt;
+    setPhase("running");setCells(pool.map(n=>({name:n,state:"alive"})));setWinners([]);
+
+    const elimOrder=shuffle([...Array(pool.length).keys()]).slice(0,elimCount);
+    const dead=new Set();
+    let t=400;
+
+    elimOrder.forEach((victimIdx,round)=>{
+      const alive=[...Array(pool.length).keys()].filter(i=>!dead.has(i));
+      const vPos=alive.indexOf(victimIdx);
+      const isLate=alive.length<=cnt+3;
+      const steps=isLate?(14+Math.floor(Math.random()*5)):(8+Math.floor(Math.random()*4));
+
+      timerRef.current.push(setTimeout(()=>{
+        setRoundInfo("💣 "+(round+1)+" / "+elimCount+"  (생존 "+alive.length+"명)");
+      },t));
+
+      for(let s=0;s<steps;s++){
+        const pos=((vPos-(steps-1-s))%alive.length+alive.length)%alive.length;
+        const hi=alive[pos];
+        const delay=40+s*s*(isLate?3.5:2);
+        t+=delay;
+        const ct=t;
+        timerRef.current.push(setTimeout(()=>{
+          setCells(prev=>prev.map((c,i)=>{
+            if(c.state==="eliminated")return c;
+            return{...c,state:i===hi?"danger":"alive"};
+          }));
+        },ct));
+      }
+
+      t+=350;
+      timerRef.current.push(setTimeout(()=>{
+        setCells(prev=>prev.map((c,i)=>
+          i===victimIdx?{...c,state:"eliminated"}:c.state==="danger"?{...c,state:"alive"}:c
+        ));
+      },t));
+
+      dead.add(victimIdx);
+      t+=isLate?700:400;
+    });
+
+    t+=600;
+    timerRef.current.push(setTimeout(()=>{
+      const w=[];
+      setCells(prev=>prev.map((c,i)=>{
+        if(c.state!=="eliminated"){w.push(pool[i]);return{...c,state:"winner"}}
+        return c;
+      }));
+      setWinners(w);setRoundInfo("");setPhase("done");
+    },t));
+  };
+
+  const start=()=>{if(!pool.length)return;count===1?startSingle():startSurvival()};
+  const cnt=Math.min(count,pool.length);
+  const isSingle=count===1;
+  const emojiFor=s=>s==="danger"?"😨":s==="eliminated"?"💀":s==="winner"?"🎉":s==="scanning"?"👀":"🙂";
+
+  return(
     <div>
       <div className="cd">
-        <p className="sl">🎴 카드 뽑기</p>
-        <p className="hint">카드를 뒤집어 {count}명을 뽑습니다. ({pool.length}명 참가)</p>
-        <div className={"lottery-grid"+(phase==="shake"?" shake":"")}>
-          {cards.map((c,i)=>(
-            <div key={i} className="lottery-card">
-              <div className={"card-inner"+(c.state==="down"||c.state==="eliminated"?" flipped":"")+(c.state==="winner"?" winner":"")+(c.state==="eliminated"?" eliminated":"")}
-                style={{transitionDelay:(phase==="flipDown"?i*30:0)+"ms"}}>
-                <div className="card-front">{c.name}</div>
-                <div className="card-back">?</div>
-              </div>
+        <p className="sl">{isSingle?"🎯 스포트라이트 추첨":"💣 서바이벌 룰렛"}</p>
+        <p className="hint">{isSingle?pool.length+"명 중 1명을 뽑습니다.":"💣 폭탄이 멈추면 탈락! "+pool.length+"명 중 "+cnt+"명이 생존합니다."}</p>
+        {roundInfo&&<div className="sv-status"><span className="sv-round">{roundInfo}</span></div>}
+        <div className="virus-grid" style={{gridTemplateColumns:"repeat("+cols+",1fr)"}}>
+          {cells.map((c,i)=>(
+            <div key={i} className={"virus-cell "+c.state}>
+              <div className="vc-emoji">{emojiFor(c.state)}</div>
+              <div className="vc-name">{c.name}</div>
             </div>
           ))}
         </div>
       </div>
       {winners.length>0&&phase==="done"&&(
-        <div className="lottery-result">
-          <div style={{fontSize:14,fontWeight:600,color:"var(--orange)",marginBottom:8}}>🎉 당첨!</div>
+        <div style={{textAlign:"center",padding:"24px 20px",background:"linear-gradient(135deg,#FFF3CD,#FFE5A0)",borderRadius:"var(--r)",marginTop:16,animation:"winPop .4s ease-out"}}>
+          <div style={{fontSize:14,fontWeight:600,color:"var(--orange)",marginBottom:8}}>🎉 {isSingle?"당첨!":"생존자!"}</div>
           <div style={{fontSize:28,fontWeight:800}}>{winners.join(", ")}</div>
         </div>
       )}
       <div className="cd" style={{padding:14}}>
         <div className="fg" style={{justifyContent:"center",gap:12}}>
-          <button className="btn bp bf" onClick={start} disabled={phase!=="idle"&&phase!=="done"} style={{fontSize:16,padding:14,maxWidth:300}}>
-            {phase==="idle"||phase==="done"?"🎴 뽑기!":"뽑는 중..."}
+          <button className="btn bp bf" onClick={start} disabled={phase==="running"} style={{fontSize:16,padding:14,maxWidth:300}}>
+            {phase==="running"?(isSingle?"스캐닝...":"탈락 진행중..."):(isSingle?"🎯 뽑기!":"💣 시작!")}
           </button>
           {phase==="done"&&<button className="btn bs" onClick={reset} style={{padding:"14px 20px"}}>↺ 리셋</button>}
         </div>
@@ -328,7 +374,7 @@ function App(){
     const handler=e=>{
       konamiRef.current.push(e.key);if(konamiRef.current.length>10)konamiRef.current.shift();
       if(konamiRef.current.join(",")===KONAMI){
-        setConfetti(true);toast.show(" 즐거웠어 대응팀.. 또 볼 수 있길! 🤞",3000);
+        setConfetti(true);toast.show(" 즐거웠어요 대응팀.. 또 볼 수 있길! 🤞",3000);
         document.body.classList.add("party-mode");
         setTimeout(()=>{setConfetti(false);document.body.classList.remove("party-mode")},3000);
         konamiRef.current=[];
@@ -352,6 +398,7 @@ function App(){
   const allTeams=useMemo(()=>{if(!extraPlayer||!dualPartner)return teams;return[...teams,{players:[extraPlayer,dualPartner],isBonus:true}]},[teams,extraPlayer,dualPartner]);
 
   const warnReset=()=>{if(teams.length>0){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);toast.show("초기화됨")}return true};
+  const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);toast.show("전체 초기화 완료")};
   const addP=()=>{const name=nn.trim();if(!name)return;if(players.some(p=>p.name===name)){toast.show("⚠️ 이미 등록됨");return}if(!warnReset())return;setPlayers(p=>[...p,{id:nid,name,skill:ns,gender:ng}]);setNn("");setNs(3);setNg(null);toast.show("✅ "+name)};
   const delP=id=>{if(!warnReset())return;setPlayers(p=>p.filter(x=>x.id!==id))};
   const startE=p=>{setEid(p.id);setEn(p.name);setEsk(p.skill);setEg(p.gender)};
@@ -444,7 +491,7 @@ function App(){
             </div>
           </div>
           <div className="cd">
-            <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>선수 목록</p><span style={{fontSize:13,color:"var(--tx2)",fontWeight:500}}>{players.length}명</span></div>
+            <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>선수 목록</p><div className="fg"><span style={{fontSize:13,color:"var(--tx2)",fontWeight:500}}>{players.length}명</span>{players.length>0&&<button className="btn bd" onClick={resetAll} style={{padding:"4px 10px",fontSize:11}}>전체 초기화</button>}</div></div>
             {!players.length?<div className="es"><div className="es-i">👤</div><div className="es-t">선수를 추가해주세요</div><div className="es-s">최소 {minPlayers}명</div></div>:
             players.map((p,i)=><div key={p.id} className="ri">
               {eid===p.id?<>
@@ -531,7 +578,7 @@ function App(){
           :<div style={{fontSize:14,color:"var(--tx2)",padding:"10px 0"}}>{players.length?`${players.length}명: ${players.map(p=>p.name).join(", ")}`:"선수 없음"}</div>}
         </div>
         <div className="cd"><p className="sl">뽑기 설정</p><div className="fg" style={{marginBottom:12}}><label style={{fontSize:14,fontWeight:500}}>인원:</label><select className="inp" value={rCnt} onChange={e=>setRC(+e.target.value)} style={{width:70,padding:"8px 10px",textAlign:"center"}}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}명</option>)}</select></div></div>
-        {rPool.length>0?<CardLottery pool={rPool} count={rCnt} />:<div className="cd es"><div className="es-i">🎴</div><div className="es-t">대상자를 추가해주세요</div></div>}
+        {rPool.length>0?<VirusLottery pool={rPool} count={rCnt} />:<div className="cd es"><div className="es-i">🎴</div><div className="es-t">대상자를 추가해주세요</div></div>}
       </div>}
 
       {mainTab==="dutch"&&<DutchPayTab players={players} />}
