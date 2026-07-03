@@ -215,6 +215,18 @@ function genRRWildcard(teams,extra,mixed){
         cands.push({p,team:t,match:om,used,sd,gOk});
       }
     }
+    /* bye 라운드 등으로 쉬는 팀의 선수도 파트너 후보에 포함 */
+    const playingIds=new Set();
+    rd.matches.forEach(m=>{(m.team1.players||[]).forEach(p=>playingIds.add(p.id));(m.team2.players||[]).forEach(p=>playingIds.add(p.id))});
+    for(const t of teams){if(t.isBonus||t.bye||t.ph)continue;
+      if((t.players||[]).some(p=>playingIds.has(p.id)))continue;
+      for(const p of(t.players||[])){if(oppIds.has(p.id)||p.id===extra.id)continue;
+        const used=usedIds.filter(id=>id===p.id).length;
+        const sd=Math.abs(extra.skill+p.skill-avgSum);
+        let gOk=true;if(mixed&&extra.gender&&p.gender&&extra.gender===p.gender)gOk=false;
+        cands.push({p,team:t,match:null,used,sd,gOk});
+      }
+    }
     cands.sort((a,b)=>{if(a.gOk!==b.gOk)return(b.gOk?1:0)-(a.gOk?1:0);if(a.used!==b.used)return a.used-b.used;return a.sd-b.sd});
     if(!cands.length)return rd;
     const chosen=cands[0];usedIds.push(chosen.p.id);
@@ -515,6 +527,7 @@ function DutchPayTab({players}){
   const[items,setItems]=useState([]);
   const[iName,setIN]=useState("");
   const[iPrice,setIP]=useState("");
+  const[balanceStr,setBalanceStr]=useState("");
 
   useEffect(()=>{if(src==="players")setPeople(players.map(p=>({name:p.name,active:true})))},[src,players]);
   const addC=()=>{const n=customName.trim();if(!n)return;setPeople(p=>[...p,{name:n,active:true}]);setCustomName("")};
@@ -524,17 +537,22 @@ function DutchPayTab({players}){
 
   const addItem=()=>{
     const n=iName.trim(),a=parseInt(iPrice,10);if(!n||!a||a<=0)return;
-    setItems(prev=>[...prev,{id:Date.now(),name:n,price:a,qty:1,mode:"all",selected:new Set(activePeople.map(p=>p.name))}]);
+    setItems(prev=>[...prev,{id:Date.now(),name:n,price:a,qty:1,fund:"personal",mode:"all",selected:new Set(activePeople.map(p=>p.name))}]);
     setIN("");setIP("");
   };
   const delItem=id=>setItems(prev=>prev.filter(x=>x.id!==id));
   const setQty=(id,q)=>setItems(prev=>prev.map(x=>x.id===id?{...x,qty:Math.max(1,q)}:x));
+  const setFund=(id,f)=>setItems(prev=>prev.map(x=>x.id===id?{...x,fund:f}:x));
   const toggleMode=id=>setItems(prev=>prev.map(x=>x.id===id?{...x,mode:x.mode==="all"?"select":"all",selected:x.mode==="all"?new Set():new Set(activePeople.map(p=>p.name))}:x));
   const togglePerson=(id,name)=>setItems(prev=>prev.map(x=>{if(x.id!==id)return x;const s=new Set(x.selected);s.has(name)?s.delete(name):s.add(name);return{...x,selected:s}}));
 
+  const balance=parseInt(balanceStr,10)||0;
+  const clubTotal=items.filter(x=>x.fund==="club").reduce((s,x)=>s+x.price*x.qty,0);
+  const remainBalance=balance-clubTotal;
+
   const perPerson=useMemo(()=>{
     const m={};activePeople.forEach(p=>m[p.name]={total:0,details:[]});
-    items.forEach(item=>{
+    items.filter(item=>item.fund==="personal").forEach(item=>{
       const sub=item.price*item.qty;
       const targets=item.mode==="all"?activePeople.map(p=>p.name):[...item.selected].filter(n=>m[n]!==undefined);
       if(!targets.length)return;
@@ -545,6 +563,7 @@ function DutchPayTab({players}){
   },[items,activePeople]);
 
   const grandTotal=items.reduce((s,x)=>s+x.price*x.qty,0);
+  const personalTotal=items.filter(x=>x.fund==="personal").reduce((s,x)=>s+x.price*x.qty,0);
   const billedTotal=Object.values(perPerson).reduce((s,x)=>s+x.total,0);
 
   return (
@@ -560,6 +579,17 @@ function DutchPayTab({players}){
         {ac>0&&<div style={{fontSize:12,color:"var(--tx2)",marginTop:8}}>{ac}명 선택됨</div>}
       </div>
       <div className="cd">
+        <p className="sl">회비 잔고</p>
+        <div className="fg" style={{alignItems:"center",gap:10}}>
+          <input className="inp" type="number" placeholder="현재 통장 잔고" value={balanceStr} onChange={e=>setBalanceStr(e.target.value)} style={{flex:1}} />
+          {balance>0&&<span style={{fontSize:14,fontWeight:700,color:"var(--tx2)",flexShrink:0}}>₩{balance.toLocaleString()}</span>}
+        </div>
+        {balance>0&&clubTotal>0&&<div style={{marginTop:10,padding:"10px 12px",background:remainBalance>=0?"var(--brand50)":"var(--danger50)",borderRadius:10,fontSize:13}}>
+          <div className="fb"><span style={{color:"var(--tx2)",fontWeight:600}}>회비 사용</span><span style={{fontWeight:700}}>−₩{clubTotal.toLocaleString()}</span></div>
+          <div className="fb" style={{marginTop:6}}><span style={{fontWeight:700,color:remainBalance>=0?"var(--brand)":"var(--danger)"}}>남은 잔고</span><span style={{fontWeight:800,fontSize:16,color:remainBalance>=0?"var(--brand)":"var(--danger)"}}>₩{remainBalance.toLocaleString()}</span></div>
+        </div>}
+      </div>
+      <div className="cd">
         <p className="sl">비용 항목</p>
         <div className="fg fw" style={{alignItems:"flex-end",gap:8,marginBottom:14}}>
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:11,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:4}}>항목명</label><input className="inp" placeholder="치킨, 코트비 등" value={iName} onChange={e=>setIN(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} /></div>
@@ -569,23 +599,28 @@ function DutchPayTab({players}){
         {!items.length&&<p style={{fontSize:13,color:"var(--tx2)",textAlign:"center",padding:"12px 0"}}>항목을 추가하세요</p>}
         {items.map(item=>{
           const sub=item.price*item.qty;
+          const isClub=item.fund==="club";
           const targets=item.mode==="all"?ac:[...item.selected].filter(n=>perPerson[n]!==undefined).length;
           const share=targets>0?Math.ceil(sub/targets):0;
-          return <div key={item.id} style={{padding:"12px 14px",background:"var(--g4)",borderRadius:12,marginBottom:8}}>
+          return <div key={item.id} style={{padding:"12px 14px",background:isClub?"var(--brand50)":"var(--g4)",borderRadius:12,marginBottom:8,border:isClub?"1px solid rgba(11,158,93,.2)":"1px solid transparent"}}>
             <div className="fb">
               <span style={{fontSize:14,fontWeight:700}}>{item.name}</span>
               <button onClick={()=>delItem(item.id)} style={{background:"none",border:"none",fontSize:14,color:"var(--tx2)",cursor:"pointer",padding:"2px 4px"}}>✕</button>
             </div>
-            <div className="fb" style={{marginTop:8,gap:8}}>
+            <div className="fg" style={{gap:4,marginTop:6,marginBottom:6}}>
+              <button className={"pill "+(isClub?"p-on":"p-off")} onClick={()=>setFund(item.id,"club")} style={{fontSize:11,padding:"3px 10px",...(isClub?{background:"var(--brand)",borderColor:"var(--brand)"}:{})}}>🏦 회비</button>
+              <button className={"pill "+(!isClub?"p-on":"p-off")} onClick={()=>setFund(item.id,"personal")} style={{fontSize:11,padding:"3px 10px",...(!isClub?{background:"var(--orange)",borderColor:"var(--orange)"}:{})}}>💵 사비</button>
+            </div>
+            <div className="fb" style={{gap:8}}>
               <span style={{fontSize:13,color:"var(--tx2)"}}>₩{item.price.toLocaleString()}</span>
               <div className="fg" style={{gap:0,background:"var(--bg)",borderRadius:8,border:"1px solid var(--bdr)",overflow:"hidden"}}>
                 <button onClick={()=>setQty(item.id,item.qty-1)} style={{padding:"5px 10px",background:"none",border:"none",fontSize:15,cursor:"pointer",color:item.qty<=1?"var(--g3)":"var(--tx)"}}>−</button>
                 <span style={{padding:"5px 8px",fontSize:14,fontWeight:700,minWidth:24,textAlign:"center",borderLeft:"1px solid var(--bdr)",borderRight:"1px solid var(--bdr)"}}>{item.qty}</span>
                 <button onClick={()=>setQty(item.id,item.qty+1)} style={{padding:"5px 10px",background:"none",border:"none",fontSize:15,cursor:"pointer",color:"var(--tx)"}}>+</button>
               </div>
-              <span style={{fontSize:15,fontWeight:800,color:"var(--brand)"}}>₩{sub.toLocaleString()}</span>
+              <span style={{fontSize:15,fontWeight:800,color:isClub?"var(--brand)":"var(--orange)"}}>₩{sub.toLocaleString()}</span>
             </div>
-            <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--bdr)"}}>
+            {!isClub&&<div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--bdr)"}}>
               <div className="fg" style={{gap:6,marginBottom:item.mode==="select"?6:0}}>
                 <button className={"pill "+(item.mode==="all"?"p-on":"p-off")} onClick={()=>toggleMode(item.id)} style={{fontSize:11,padding:"3px 10px"}}>전체 균등</button>
                 <button className={"pill "+(item.mode==="select"?"p-on":"p-off")} onClick={()=>toggleMode(item.id)} style={{fontSize:11,padding:"3px 10px"}}>개별 선택</button>
@@ -594,23 +629,33 @@ function DutchPayTab({players}){
               {item.mode==="select"&&<div className="fg fw" style={{gap:4,marginTop:4}}>
                 {activePeople.map(p=><button key={p.name} className={"pill "+(item.selected.has(p.name)?"p-on":"p-off")} onClick={()=>togglePerson(item.id,p.name)} style={{fontSize:11,padding:"3px 9px"}}>{p.name}</button>)}
               </div>}
-            </div>
+            </div>}
+            {isClub&&<div style={{marginTop:6,fontSize:11,color:"var(--brand)",fontWeight:600}}>회비에서 차감 · 개인 정산 제외</div>}
           </div>})}
-        {items.length>0&&<div style={{textAlign:"right",padding:"12px 0",borderTop:"2px solid var(--g2)"}}>
-          <span style={{fontSize:13,color:"var(--tx2)"}}>총계 </span>
-          <span style={{fontSize:22,fontWeight:800,color:"var(--brand)"}}>₩{grandTotal.toLocaleString()}</span>
+        {items.length>0&&<div style={{padding:"12px 0",borderTop:"2px solid var(--g2)"}}>
+          {clubTotal>0&&<div className="fb" style={{marginBottom:4}}><span style={{fontSize:12,color:"var(--brand)",fontWeight:600}}>🏦 회비 소계</span><span style={{fontSize:14,fontWeight:700,color:"var(--brand)"}}>₩{clubTotal.toLocaleString()}</span></div>}
+          {personalTotal>0&&<div className="fb" style={{marginBottom:4}}><span style={{fontSize:12,color:"var(--orange)",fontWeight:600}}>💵 사비 소계</span><span style={{fontSize:14,fontWeight:700,color:"var(--orange)"}}>₩{personalTotal.toLocaleString()}</span></div>}
+          <div className="fb"><span style={{fontSize:13,color:"var(--tx2)"}}>총계</span><span style={{fontSize:22,fontWeight:800,color:"var(--tx)"}}>₩{grandTotal.toLocaleString()}</span></div>
         </div>}
       </div>
       {items.length>0&&ac>0&&<div className="cd">
         <p className="sl">정산 결과</p>
-        {billedTotal>grandTotal&&<p style={{fontSize:11,color:"var(--orange)",marginBottom:10}}>* 올림 적용 (차액 ₩{(billedTotal-grandTotal).toLocaleString()})</p>}
-        {activePeople.map(p=>{const d=perPerson[p.name];if(!d)return null;return <div key={p.name} style={{padding:"10px 12px",background:"var(--g4)",borderRadius:10,marginBottom:6}}>
-          <div className="fb">
-            <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
-            <span style={{fontSize:16,fontWeight:800,color:d.total>0?"var(--brand)":"var(--tx2)"}}>₩{d.total.toLocaleString()}</span>
-          </div>
-          {d.details.length>0&&<div style={{fontSize:11,color:"var(--tx2)",marginTop:4}}>{d.details.map(x=>x.name+" ₩"+x.amount.toLocaleString()).join(" + ")}</div>}
-        </div>})}
+        {balance>0&&clubTotal>0&&<div style={{padding:"10px 12px",background:remainBalance>=0?"var(--brand50)":"var(--danger50)",borderRadius:10,marginBottom:12}}>
+          <div className="fb"><span style={{fontSize:12,fontWeight:600,color:"var(--tx2)"}}>현재 잔고</span><span style={{fontSize:13,fontWeight:700}}>₩{balance.toLocaleString()}</span></div>
+          {items.filter(x=>x.fund==="club").map(x=><div key={x.id} className="fb" style={{marginTop:3}}><span style={{fontSize:11,color:"var(--tx2)"}}>  − {x.name}</span><span style={{fontSize:11,color:"var(--tx2)"}}>₩{(x.price*x.qty).toLocaleString()}</span></div>)}
+          <div className="fb" style={{marginTop:6,paddingTop:6,borderTop:"1px solid var(--bdr)"}}><span style={{fontSize:13,fontWeight:800,color:remainBalance>=0?"var(--brand)":"var(--danger)"}}>정산 후 잔고</span><span style={{fontSize:17,fontWeight:800,color:remainBalance>=0?"var(--brand)":"var(--danger)"}}>₩{remainBalance.toLocaleString()}</span></div>
+        </div>}
+        {personalTotal>0&&<>
+          {billedTotal>personalTotal&&<p style={{fontSize:11,color:"var(--orange)",marginBottom:10}}>* 올림 적용 (차액 ₩{(billedTotal-personalTotal).toLocaleString()})</p>}
+          {activePeople.map(p=>{const d=perPerson[p.name];if(!d)return null;return <div key={p.name} style={{padding:"10px 12px",background:"var(--g4)",borderRadius:10,marginBottom:6}}>
+            <div className="fb">
+              <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
+              <span style={{fontSize:16,fontWeight:800,color:d.total>0?"var(--orange)":"var(--tx2)"}}>₩{d.total.toLocaleString()}</span>
+            </div>
+            {d.details.length>0&&<div style={{fontSize:11,color:"var(--tx2)",marginTop:4}}>{d.details.map(x=>x.name+" ₩"+x.amount.toLocaleString()).join(" + ")}</div>}
+          </div>})}
+        </>}
+        {personalTotal===0&&clubTotal>0&&<p style={{fontSize:13,color:"var(--tx2)",textAlign:"center",padding:"8px 0"}}>사비 항목 없음 · 개인 정산 불필요</p>}
       </div>}
     </div>
   );
