@@ -1212,25 +1212,24 @@ function App(){
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
   const shareSession=(sess)=>{
-    const fname="wildcock_record_"+sess.date+".json";
+    const fname="record_"+sess.date+".json";
     const jsonStr=JSON.stringify([sess],null,2);
     const blob=new Blob([jsonStr],{type:"application/json"});
     const file=new File([blob],fname,{type:"application/json"});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       navigator.share({title:"와일드콕 기록 "+sess.date,text:sess.date+" 매치 기록 ("+sess.matchData.length+"경기)",files:[file]}).catch(()=>{});
     }else{
-      /* 파일 공유 미지원 시 다운로드 폴백 */
       const url=URL.createObjectURL(blob);const a=document.createElement("a");
       a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-      toast.show("📥 파일 다운로드됨 — 관리자에게 전달해주세요");
+      toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
     }
   };
   const exportHistory=()=>{
+    const fname="records_"+new Date().toISOString().slice(0,10)+".json";
     const blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
-    a.href=url;a.download="wildcock_records_"+new Date().toISOString().slice(0,10)+".json";
-    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    toast.show("📥 백업 파일 다운로드됨");
+    a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    toast.show("📥 "+fname+" 다운로드 완료");
   };
   const importHistory=(e)=>{
     const file=e.target.files[0];if(!file)return;
