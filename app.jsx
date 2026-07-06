@@ -663,8 +663,9 @@ function DutchPayTab({players}){
 
 /* 기록실 탭 */
 function RecordsTab({history,onDelete,onExport,onImport}){
-  const[view,setView]=useState("stats");
+  const[view,setView]=useState("dashboard");
   const[selPlayer,setSelPlayer]=useState(null);
+  const[expandSess,setExpandSess]=useState(null);
 
   const stats=useMemo(()=>{
     const pm={};
@@ -716,8 +717,9 @@ function RecordsTab({history,onDelete,onExport,onImport}){
 
     const playerArr=Object.entries(pm).map(([name,d])=>{
       const rate=d.games?Math.round(d.w/d.games*100):0;
+      const sessCnt=Object.keys(d.sessions).length;
       const trend=Object.entries(d.sessions).sort(([a],[b])=>a.localeCompare(b)).map(([date,r])=>({date,w:r.w,l:r.l,rate:r.w+r.l+r.d>0?Math.round(r.w/(r.w+r.l+r.d)*100):0}));
-      return{name,...d,rate,trend};
+      return{name,...d,rate,sessCnt,trend};
     }).sort((a,b)=>b.rate-a.rate||b.games-a.games);
 
     const synArr=Object.values(syn).filter(s=>s.games>=2).sort((a,b)=>{
@@ -725,7 +727,14 @@ function RecordsTab({history,onDelete,onExport,onImport}){
       return rb-ra||b.games-a.games;
     });
 
-    return{players:playerArr,h2h,synergy:synArr};
+    /* 종합 대시보드 */
+    const totalSessions=history.length;
+    const totalGames=history.reduce((s,x)=>s+x.matchData.filter(m=>!isNaN(m.s1)&&!isNaN(m.s2)).length,0);
+    const topWinner=playerArr.length?playerArr.reduce((a,b)=>b.w>a.w?b:a):null;
+    const topRate=playerArr.filter(p=>p.games>=3).length?playerArr.filter(p=>p.games>=3).reduce((a,b)=>b.rate>a.rate?b:a):null;
+    const mostActive=playerArr.length?playerArr.reduce((a,b)=>b.sessCnt>a.sessCnt?b:a):null;
+
+    return{players:playerArr,h2h,synergy:synArr,dash:{totalSessions,totalGames,topWinner,topRate,mostActive}};
   },[history]);
 
   const allNames=stats.players.map(p=>p.name);
@@ -743,11 +752,66 @@ function RecordsTab({history,onDelete,onExport,onImport}){
 
   return <div>
     <div className="fg" style={{marginBottom:14,gap:6,flexWrap:"wrap"}}>
-      <button className={"pill "+(view==="stats"?"p-on":"p-off")} onClick={()=>setView("stats")}>👤 개인 통계</button>
-      <button className={"pill "+(view==="h2h"?"p-on":"p-off")} onClick={()=>setView("h2h")}>⚔️ 상대 전적</button>
+      <button className={"pill "+(view==="dashboard"?"p-on":"p-off")} onClick={()=>setView("dashboard")}>🏠 종합</button>
+      <button className={"pill "+(view==="stats"?"p-on":"p-off")} onClick={()=>setView("stats")}>👤 개인</button>
+      <button className={"pill "+(view==="attendance"?"p-on":"p-off")} onClick={()=>setView("attendance")}>📋 참여</button>
+      <button className={"pill "+(view==="h2h"?"p-on":"p-off")} onClick={()=>setView("h2h")}>⚔️ 상대</button>
       <button className={"pill "+(view==="synergy"?"p-on":"p-off")} onClick={()=>setView("synergy")}>🤝 시너지</button>
-      <button className={"pill "+(view==="history"?"p-on":"p-off")} onClick={()=>setView("history")}>📅 기록 목록</button>
+      <button className={"pill "+(view==="history"?"p-on":"p-off")} onClick={()=>setView("history")}>📅 기록</button>
     </div>
+
+    {view==="dashboard"&&<div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--brand)"}}>{stats.dash.totalSessions}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>총 세션</div></div>
+        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--pri)"}}>{stats.dash.totalGames}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>총 경기</div></div>
+        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--green)"}}>{stats.players.length}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>등록 선수</div></div>
+        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--orange)"}}>{stats.synergy.length}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>시너지 조합</div></div>
+      </div>
+      <div className="cd">
+        <p className="sl">🏆 명예의 전당</p>
+        {stats.dash.topWinner&&<div className="fb" style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
+          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최다승</div><span style={{fontSize:15,fontWeight:700}}>🥇 {stats.dash.topWinner.name}</span></div>
+          <span style={{fontSize:16,fontWeight:800,color:"var(--brand)"}}>{stats.dash.topWinner.w}승</span>
+        </div>}
+        {stats.dash.topRate&&<div className="fb" style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
+          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최고 승률 (3경기+)</div><span style={{fontSize:15,fontWeight:700}}>🎯 {stats.dash.topRate.name}</span></div>
+          <span style={{fontSize:16,fontWeight:800,color:"var(--green)"}}>{stats.dash.topRate.rate}%</span>
+        </div>}
+        {stats.dash.mostActive&&<div className="fb" style={{padding:"10px 0"}}>
+          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최다 참여</div><span style={{fontSize:15,fontWeight:700}}>🔥 {stats.dash.mostActive.name}</span></div>
+          <span style={{fontSize:16,fontWeight:800,color:"var(--orange)"}}>{stats.dash.mostActive.sessCnt}회</span>
+        </div>}
+      </div>
+      {stats.synergy.length>0&&<div className="cd" style={{marginTop:10}}>
+        <p className="sl">🤝 베스트 콤비</p>
+        {stats.synergy.slice(0,3).map((s,i)=>{const pct=Math.round(s.w/s.games*100);
+          return <div key={i} className="fb" style={{padding:"8px 0",borderBottom:i<2?"1px solid var(--g3)":"none"}}>
+            <span style={{fontSize:13,fontWeight:600}}>{["🥇","🥈","🥉"][i]} {s.names[0]} + {s.names[1]}</span>
+            <span style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>{pct}% ({s.games}전)</span>
+          </div>})}
+      </div>}
+    </div>}
+
+    {view==="attendance"&&<div className="cd">
+      <p className="sl">📋 참여율 ({stats.players.length}명)</p>
+      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>총 {stats.dash.totalSessions}세션 기준 · 참석 횟수순</p>
+      {[...stats.players].sort((a,b)=>b.sessCnt-a.sessCnt||b.games-a.games).map((p,i)=>{
+        const pct=stats.dash.totalSessions?Math.round(p.sessCnt/stats.dash.totalSessions*100):0;
+        return <div key={p.name} style={{padding:"10px 0",borderBottom:i<stats.players.length-1?"1px solid var(--g3)":"none"}}>
+          <div className="fb">
+            <div>
+              <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
+              <div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>{p.sessCnt}회 참석 · {p.games}경기 · {p.w}승 {p.l}패</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:17,fontWeight:800,color:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--tx2)"}}>{pct}%</div>
+              <div style={{fontSize:10,color:"var(--tx2)"}}>출석</div>
+            </div>
+          </div>
+          <div className="rb" style={{marginTop:6,height:4}}><div className="rf" style={{width:pct+"%",background:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--g2)"}} /></div>
+        </div>
+      })}
+    </div>}
 
     {view==="stats"&&<div className="cd">
       <p className="sl">👤 개인 통계 ({stats.players.length}명)</p>
@@ -832,15 +896,46 @@ function RecordsTab({history,onDelete,onExport,onImport}){
         {history.map(sess=>{
           const names=new Set();
           sess.matchData.forEach(m=>{[...m.t1,...m.t2].forEach(n=>names.add(n))});
-          return <div key={sess.id} style={{padding:"12px 0",borderBottom:"1px solid var(--g3)"}}>
-            <div className="fb">
+          const isOpen=expandSess===sess.id;
+          /* 세션 내 순위 계산 */
+          const sessRank=(()=>{
+            if(!isOpen)return[];
+            const rm={};
+            sess.matchData.forEach(m=>{
+              const s1=m.s1,s2=m.s2;if(isNaN(s1)||isNaN(s2))return;
+              const k1=[...m.t1].sort().join("|"),k2=[...m.t2].sort().join("|");
+              if(!rm[k1])rm[k1]={name:m.t1.join(" · "),w:0,l:0,pts:0,pf:0,pa:0};
+              if(!rm[k2])rm[k2]={name:m.t2.join(" · "),w:0,l:0,pts:0,pf:0,pa:0};
+              rm[k1].pf+=s1;rm[k1].pa+=s2;rm[k2].pf+=s2;rm[k2].pa+=s1;
+              if(s1>s2){rm[k1].w++;rm[k1].pts++;rm[k2].l++}else if(s2>s1){rm[k2].w++;rm[k2].pts++;rm[k1].l++}
+            });
+            return Object.values(rm).sort((a,b)=>b.pts-a.pts||(b.pf-b.pa)-(a.pf-a.pa));
+          })();
+          return <div key={sess.id} style={{borderBottom:"1px solid var(--g3)"}}>
+            <div className="fb" style={{padding:"12px 0",cursor:"pointer"}} onClick={()=>setExpandSess(isOpen?null:sess.id)}>
               <div>
-                <div style={{fontSize:14,fontWeight:600}}>{sess.date}</div>
-                <div style={{fontSize:12,color:"var(--tx2)",marginTop:3}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
-                <div style={{fontSize:11,color:"var(--g1)",marginTop:2}}>{[...names].slice(0,6).join(", ")}{names.size>6?" 외 "+(names.size-6)+"명":""}</div>
+                <div style={{fontSize:14,fontWeight:600}}><span style={{display:"inline-block",transition:"transform .2s",transform:isOpen?"rotate(90deg)":"rotate(0)",marginRight:6,fontSize:10}}>▶</span>{sess.date}</div>
+                <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
               </div>
-              <button className="btn bd" onClick={()=>onDelete(sess.id)} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>
+              <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>
             </div>
+            {isOpen&&<div style={{paddingBottom:14,marginLeft:10,borderLeft:"2px solid var(--g3)",paddingLeft:14}}>
+              {sess.matchData.map((m,mi)=>{
+                const s1=m.s1,s2=m.s2,ok=!isNaN(s1)&&!isNaN(s2);
+                const w1=ok&&s1>s2,w2=ok&&s2>s1;
+                return <div key={mi} className="mr" style={{marginBottom:6}}>
+                  <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.t1.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
+                  <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{ok?s1:"-"} : {ok?s2:"-"}</span></div>
+                  <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.t2.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
+                </div>})}
+              {sessRank.length>0&&<div style={{marginTop:10,padding:"10px 12px",background:"var(--g4)",borderRadius:10}}>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--tx2)",marginBottom:8}}>📊 이날의 순위</div>
+                {sessRank.map((r,i)=><div key={i} className="fb" style={{padding:"4px 0"}}>
+                  <span style={{fontSize:13}}><span style={{fontWeight:800,color:i===0?"var(--gold)":i<3?"var(--brand)":"var(--tx2)",marginRight:6}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontWeight:600}}>{r.name}</span></span>
+                  <span style={{fontSize:12,color:"var(--tx2)"}}>{r.w}승{r.l}패 · {r.pf}-{r.pa}</span>
+                </div>)}
+              </div>}
+            </div>}
           </div>
         })}
       </div>
@@ -879,6 +974,69 @@ function ShareModal({txt,url,onClose}){
   </div>;
 }
 
+/* 공유 뷰 (별도 컴포넌트 — Safari 호환) */
+function SharedView({data}){
+  const allM=(data.r||[]).flatMap(function(rd){return rd.m});
+  const sDone=allM.filter(function(m){return m.s1!==""&&m.s2!==""}).length;
+  const sTotal=allM.length;
+  const sPct=sTotal?Math.round(sDone/sTotal*100):0;
+  const hasScore=sDone>0;
+
+  const sRank=useMemo(function(){
+    if(!hasScore)return[];
+    var m={};
+    (data.t||[]).forEach(function(t){var k=t.p.map(function(x){return x.n}).sort().join("|");m[k]={name:t.p.map(function(x){return x.n}).join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:!!t.b}});
+    allM.forEach(function(x){
+      var a=parseInt(x.s1,10),b=parseInt(x.s2,10);if(isNaN(a)||isNaN(b))return;
+      var k1=[].concat(x.a).sort().join("|"),k2=[].concat(x.b).sort().join("|");
+      if(!m[k1])m[k1]={name:x.a.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
+      if(!m[k2])m[k2]={name:x.b.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
+      m[k1].pf+=a;m[k1].pa+=b;m[k2].pf+=b;m[k2].pa+=a;
+      if(a>b){m[k1].w++;m[k1].pts++;m[k2].l++;m[k1].h2h[k2]=(m[k1].h2h[k2]||0)+1}
+      else if(b>a){m[k2].w++;m[k2].pts++;m[k1].l++;m[k2].h2h[k1]=(m[k2].h2h[k1]||0)+1}
+      else{m[k1].d++;m[k2].d++}
+    });
+    var arr=Object.entries(m).map(function(e){return Object.assign({},e[1],{key:e[0]})});
+    arr.sort(function(a,b){if(b.pts!==a.pts)return b.pts-a.pts;var aw=a.h2h[b.key]||0,bw=b.h2h[a.key]||0;if(aw!==bw)return bw-aw;return(b.pf-b.pa)-(a.pf-a.pa)});
+    return arr;
+  },[data,hasScore]);
+
+  return <main className="mn" style={{paddingTop:16}}>
+    <div className="cd">
+      <p className="sl">{data.t.length}개 조</p>
+      <div className="tg">{data.t.map(function(t,i){return <div key={i} className={"tc"+(t.b?" bonus":"")}>
+        <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:t.b?"var(--gold)":"var(--brand)"}}>{t.b?"와일드카드":"조 "+(i+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)",background:"var(--card)",border:"1px solid var(--bdr)",padding:"2px 7px",borderRadius:5}}>합 {t.p.reduce(function(s,x){return s+x.s},0)}</span></div>
+        {t.p.map(function(p,j){return <div key={j} className="fb" style={{marginTop:4}}><span style={{fontSize:14,fontWeight:500}}>{p.n}</span><span className="fg"><Badge level={p.s} />{p.g&&<GBadge gender={p.g} />}</span></div>})}
+      </div>})}</div>
+    </div>
+    {sTotal>0&&<div style={{marginBottom:14}}>
+      <div className="fg" style={{marginBottom:5}}>
+        <span style={{fontSize:12,fontWeight:700,color:sPct===100?"var(--green)":"var(--tx2)"}}>{sPct===100?"✅ 전체 완료":sDone+" / "+sTotal+" 경기"}</span>
+        <span style={{fontSize:11,color:"var(--tx2)",marginLeft:"auto"}}>{sPct}%</span>
+      </div>
+      <div className="rb" style={{height:5}}><div className="rf" style={{width:sPct+"%",background:sPct===100?"var(--green)":"var(--brand)",transition:"width .4s ease"}} /></div>
+    </div>}
+    {data.r&&data.r.length>0&&data.r.map(function(rd,ri){return <div key={ri} className="cd">
+      <div className="sl fg"><span>{rd.l||("라운드 "+rd.n)}</span><span style={{fontSize:11,color:"var(--tx2)",fontWeight:600,background:"var(--g4)",padding:"2px 7px",borderRadius:5}}>{rd.m.length}경기</span></div>
+      {rd.m.map(function(m,mi){var a=parseInt(m.s1,10),b=parseInt(m.s2,10),ok=!isNaN(a)&&!isNaN(b);var w1=ok&&a>b,w2=ok&&b>a;
+        return <div key={mi}>{m.c>0&&<span className="court-tag" style={{background:COURT_C[(m.c-1)%4]}}>코트 {m.c}</span>}<div className="mr">
+          <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.a.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
+          <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{m.s1||"-"} : {m.s2||"-"}</span></div>
+          <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.b.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
+        </div></div>})}
+    </div>})}
+    {hasScore?<div className="cd">
+      <p className="sl">📊 순위표</p>
+      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>승리 +1점 · 동률: 승자승 → 득실차</p>
+      {sRank.map(function(r,i){var tot=r.w+r.l+r.d;var pct=tot?Math.round(r.w/tot*100):0;
+        return <div key={i} className="rr"><span style={{fontSize:15,fontWeight:800,color:i===0?"var(--gold)":i<3?"var(--brand)":"var(--g1)",width:26,textAlign:"center"}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontSize:14,fontWeight:700,minWidth:90,flex:"0 0 auto"}}>{r.name}{r.isBonus&&<span className="dual-tag" style={{marginLeft:4,background:"var(--gold)",color:"#fff"}}>⭐</span>}</span><span style={{fontSize:12,color:"var(--tx2)",minWidth:55}}>{r.w}승 {r.l}패</span><span style={{fontSize:13,fontWeight:800,color:"var(--brand)",minWidth:30}}>{r.pts}점</span><div className="rb"><div className="rf" style={{width:pct+"%"}} /></div><span style={{fontSize:12,color:"var(--tx2)",minWidth:50,textAlign:"right"}}>{r.pf}-{r.pa}</span></div>})}
+    </div>:<div className="cd" style={{textAlign:"center",padding:"20px"}}><p style={{fontSize:13,color:"var(--tx2)"}}>매치 결과 입력 후 표시됩니다.</p></div>}
+    <div className="cd" style={{textAlign:"center",padding:20}}>
+      <button className="btn bp bf" onClick={function(){window.location.hash="";window.location.reload()}} style={{padding:"12px 24px"}}>🏸 와일드콕 열기</button>
+    </div>
+  </main>;
+}
+
 /* ═══════════════════════════════════════ */
 /*  메인 앱                                 */
 /* ═══════════════════════════════════════ */
@@ -887,6 +1045,13 @@ function App(){
   useEffect(()=>{
     if(!document.getElementById("wc-styles")){
       const s=document.createElement("style");s.id="wc-styles";s.textContent=CSS;document.head.appendChild(s);
+    }
+    /* favicon 동적 주입 — DC 런타임 부팅 후에도 확실히 적용 */
+    if(!document.getElementById("wc-favicon")){
+      const old=document.querySelector('link[rel="icon"],link[rel="shortcut icon"]');
+      if(old)old.remove();
+      const lnk=document.createElement("link");lnk.id="wc-favicon";lnk.rel="icon";lnk.href="uploads/favicon_32.png";
+      document.head.appendChild(lnk);
     }
   },[]);
 
@@ -1140,27 +1305,7 @@ function App(){
         </div>
       </header>
 
-      {sharedView&&_shared?<main className="mn" style={{paddingTop:16}}>
-        <div className="cd">
-          <p className="sl">{_shared.t.length}개 조</p>
-          <div className="tg">{_shared.t.map((t,i)=><div key={i} className={"tc"+(t.b?" bonus":"")}>
-            <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:t.b?"var(--gold)":"var(--brand)"}}>{t.b?"와일드카드":"조 "+(i+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)",background:"var(--card)",border:"1px solid var(--bdr)",padding:"2px 7px",borderRadius:5}}>합 {t.p.reduce((s,x)=>s+x.s,0)}</span></div>
-            {t.p.map((p,j)=><div key={j} className="fb" style={{marginTop:4}}><span style={{fontSize:14,fontWeight:500}}>{p.n}</span><span className="fg"><Badge level={p.s} />{p.g&&<GBadge gender={p.g} />}</span></div>)}
-          </div>)}</div>
-        </div>
-        {_shared.r&&_shared.r.length>0&&_shared.r.map((rd,ri)=><div key={ri} className="cd">
-          <div className="sl fg"><span>{rd.l||("라운드 "+rd.n)}</span><span style={{fontSize:11,color:"var(--tx2)",fontWeight:600,background:"var(--g4)",padding:"2px 7px",borderRadius:5}}>{rd.m.length}경기</span></div>
-          {rd.m.map((m,mi)=>{const a=parseInt(m.s1,10),b=parseInt(m.s2,10),ok=!isNaN(a)&&!isNaN(b);const w1=ok&&a>b,w2=ok&&b>a;
-            return <div key={mi}>{m.c>0&&<span className="court-tag" style={{background:COURT_C[(m.c-1)%4]}}>코트 {m.c}</span>}<div className="mr">
-              <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.a.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
-              <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{m.s1||"-"} : {m.s2||"-"}</span></div>
-              <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.b.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
-            </div></div>})}
-        </div>)}
-        <div className="cd" style={{textAlign:"center",padding:20}}>
-          <button className="btn bp bf" onClick={()=>{window.location.hash="";window.location.reload()}} style={{padding:"12px 24px"}}>🏸 와일드콕 열기</button>
-        </div>
-      </main>:<main className="mn" style={{paddingTop:16}}>
+      {sharedView&&_shared?<SharedView data={_shared} />:<main className="mn" style={{paddingTop:16}}>
 
       {mainTab==="badminton"&&<div>
         <StatBento playerCount={players.length} teamCount={realTeamCount} matchCount={totalMatchCount} />
