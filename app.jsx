@@ -735,14 +735,18 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
       return rb-ra||b.games-a.games;
     });
 
-    /* 종합 대시보드 */
+    /* 종합 대시보드 — 공동 순위 처리 */
     const totalSessions=allHistory.length;
     const totalGames=allHistory.reduce((s,x)=>s+x.matchData.filter(m=>!isNaN(m.s1)&&!isNaN(m.s2)).length,0);
-    const topWinner=playerArr.length?playerArr.reduce((a,b)=>b.w>a.w?b:a):null;
-    const topRate=playerArr.filter(p=>p.games>=3).length?playerArr.filter(p=>p.games>=3).reduce((a,b)=>b.rate>a.rate?b:a):null;
-    const mostActive=playerArr.length?playerArr.reduce((a,b)=>b.sessCnt>a.sessCnt?b:a):null;
+    const maxW=playerArr.length?Math.max(...playerArr.map(p=>p.w)):0;
+    const topWinners=playerArr.filter(p=>p.w===maxW&&maxW>0);
+    const rated=playerArr.filter(p=>p.games>=3);
+    const maxRate=rated.length?Math.max(...rated.map(p=>p.rate)):0;
+    const topRates=rated.filter(p=>p.rate===maxRate&&maxRate>0);
+    const maxSess=playerArr.length?Math.max(...playerArr.map(p=>p.sessCnt)):0;
+    const mostActives=playerArr.filter(p=>p.sessCnt===maxSess&&maxSess>0);
 
-    return{players:playerArr,h2h,synergy:synArr,dash:{totalSessions,totalGames,topWinner,topRate,mostActive}};
+    return{players:playerArr,h2h,synergy:synArr,dash:{totalSessions,totalGames,topWinners,topRates,mostActives}};
   },[allHistory]);
 
   const allNames=stats.players.map(p=>p.name);
@@ -777,17 +781,26 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
       </div>
       <div className="cd">
         <p className="sl">👀 눈 여겨볼 기록</p>
-        {stats.dash.topWinner&&<div className="fb" style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
-          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최다승</div><span style={{fontSize:15,fontWeight:700}}>🥇 {stats.dash.topWinner.name}</span></div>
-          <span style={{fontSize:16,fontWeight:800,color:"var(--brand)"}}>{stats.dash.topWinner.w}승</span>
+        {stats.dash.topWinners.length>0&&<div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
+          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최다승</div>
+          {stats.dash.topWinners.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
+            <span style={{fontSize:15,fontWeight:700}}>🥇 {p.name}</span>
+            <span style={{fontSize:16,fontWeight:800,color:"var(--brand)"}}>{p.w}승</span>
+          </div>)}
         </div>}
-        {stats.dash.topRate&&<div className="fb" style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
-          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최고 승률 (3경기+)</div><span style={{fontSize:15,fontWeight:700}}>🎯 {stats.dash.topRate.name}</span></div>
-          <span style={{fontSize:16,fontWeight:800,color:"var(--green)"}}>{stats.dash.topRate.rate}%</span>
+        {stats.dash.topRates.length>0&&<div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
+          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최고 승률 (3경기+)</div>
+          {stats.dash.topRates.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
+            <span style={{fontSize:15,fontWeight:700}}>🎯 {p.name}</span>
+            <span style={{fontSize:16,fontWeight:800,color:"var(--green)"}}>{p.rate}%</span>
+          </div>)}
         </div>}
-        {stats.dash.mostActive&&<div className="fb" style={{padding:"10px 0"}}>
-          <div><div style={{fontSize:11,color:"var(--tx2)"}}>최다 참여</div><span style={{fontSize:15,fontWeight:700}}>🔥 {stats.dash.mostActive.name}</span></div>
-          <span style={{fontSize:16,fontWeight:800,color:"var(--orange)"}}>{stats.dash.mostActive.sessCnt}회</span>
+        {stats.dash.mostActives.length>0&&<div style={{padding:"10px 0"}}>
+          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최다 참여</div>
+          {stats.dash.mostActives.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
+            <span style={{fontSize:15,fontWeight:700}}>🔥 {p.name}</span>
+            <span style={{fontSize:16,fontWeight:800,color:"var(--orange)"}}>{p.sessCnt}회</span>
+          </div>)}
         </div>}
       </div>
       {stats.synergy.length>0&&<div className="cd" style={{marginTop:10}}>
@@ -1215,11 +1228,18 @@ function App(){
     const fname="record_"+sess.date+".json";
     const jsonStr=JSON.stringify([sess],null,2);
     const blob=new Blob([jsonStr],{type:"application/json"});
-    const file=new File([blob],fname,{type:"application/json"});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      navigator.share({title:"와일드콕 기록 "+sess.date,text:sess.date+" 매치 기록 ("+sess.matchData.length+"경기)",files:[file]}).catch(()=>{});
-    }else{
-      const url=URL.createObjectURL(blob);const a=document.createElement("a");
+    /* 모바일 Web Share API 시도 */
+    var shared=false;
+    try{
+      var file=new File([blob],fname,{type:"application/json"});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        navigator.share({title:"와일드콕 기록 "+sess.date,text:sess.date+" 매치 기록 ("+sess.matchData.length+"경기)",files:[file]}).catch(function(){});
+        shared=true;
+      }
+    }catch(e){/* canShare 또는 File 미지원 */}
+    /* 미지원 시 다운로드 폴백 */
+    if(!shared){
+      var url=URL.createObjectURL(blob);var a=document.createElement("a");
       a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
       toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
     }
