@@ -661,6 +661,22 @@ function DutchPayTab({players}){
   );
 }
 
+/* 대시보드 기록 항목 — 3명 이상 시 접기/펼치기 */
+function DashRecord({label,icon,items,color}){
+  const[open,setOpen]=useState(false);
+  const LIMIT=2;
+  const show=open?items:items.slice(0,LIMIT);
+  const more=items.length>LIMIT;
+  return <div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
+    <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>{label}{items.length>1&&<span style={{marginLeft:4,fontSize:10,color:color,fontWeight:700}}>공동 {items.length}명</span>}</div>
+    {show.map(function(p,i){return <div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
+      <span style={{fontSize:15,fontWeight:700}}>{icon} {p.name}</span>
+      <span style={{fontSize:16,fontWeight:800,color:color}}>{p.val}</span>
+    </div>})}
+    {more&&<button onClick={function(){setOpen(!open)}} style={{background:"none",border:"none",fontSize:11,color:"var(--tx2)",cursor:"pointer",padding:"6px 0",width:"100%",textAlign:"center"}}>{open?"접기 ▲":"+"+(items.length-LIMIT)+"명 더보기 ▼"}</button>}
+  </div>;
+}
+
 /* 기록실 탭 */
 function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
   const[view,setView]=useState("dashboard");
@@ -781,27 +797,9 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
       </div>
       <div className="cd">
         <p className="sl">👀 눈 여겨볼 기록</p>
-        {stats.dash.topWinners.length>0&&<div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
-          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최다승</div>
-          {stats.dash.topWinners.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
-            <span style={{fontSize:15,fontWeight:700}}>🥇 {p.name}</span>
-            <span style={{fontSize:16,fontWeight:800,color:"var(--brand)"}}>{p.w}승</span>
-          </div>)}
-        </div>}
-        {stats.dash.topRates.length>0&&<div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
-          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최고 승률 (3경기+)</div>
-          {stats.dash.topRates.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
-            <span style={{fontSize:15,fontWeight:700}}>🎯 {p.name}</span>
-            <span style={{fontSize:16,fontWeight:800,color:"var(--green)"}}>{p.rate}%</span>
-          </div>)}
-        </div>}
-        {stats.dash.mostActives.length>0&&<div style={{padding:"10px 0"}}>
-          <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>최다 참여</div>
-          {stats.dash.mostActives.map((p,i)=><div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
-            <span style={{fontSize:15,fontWeight:700}}>🔥 {p.name}</span>
-            <span style={{fontSize:16,fontWeight:800,color:"var(--orange)"}}>{p.sessCnt}회</span>
-          </div>)}
-        </div>}
+        {stats.dash.topWinners.length>0&&<DashRecord label="최다승" icon="🥇" items={stats.dash.topWinners.map(function(p){return{name:p.name,val:p.w+"승"}})} color="var(--brand)" />}
+        {stats.dash.topRates.length>0&&<DashRecord label="최고 승률 (3경기+)" icon="🎯" items={stats.dash.topRates.map(function(p){return{name:p.name,val:p.rate+"%"}})} color="var(--green)" />}
+        {stats.dash.mostActives.length>0&&<DashRecord label="최다 참여" icon="🔥" items={stats.dash.mostActives.map(function(p){return{name:p.name,val:p.sessCnt+"회"}})} color="var(--orange)" />}
       </div>
       {stats.synergy.length>0&&<div className="cd" style={{marginTop:10}}>
         <p className="sl">🤝 베스트 콤비</p>
@@ -1224,25 +1222,29 @@ function App(){
       .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
-  const shareSession=(sess)=>{
-    const fname="record_"+sess.date+".json";
-    const jsonStr=JSON.stringify([sess],null,2);
-    const blob=new Blob([jsonStr],{type:"application/json"});
-    /* 모바일 Web Share API 시도 */
-    var shared=false;
-    try{
-      var file=new File([blob],fname,{type:"application/json"});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        navigator.share({title:"와일드콕 기록 "+sess.date,text:sess.date+" 매치 기록 ("+sess.matchData.length+"경기)",files:[file]}).catch(function(){});
-        shared=true;
-      }
-    }catch(e){/* canShare 또는 File 미지원 */}
-    /* 미지원 시 다운로드 폴백 */
-    if(!shared){
-      var url=URL.createObjectURL(blob);var a=document.createElement("a");
-      a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-      toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
+  const shareSession=function(sess){
+    var fname="record_"+sess.date+".json";
+    var jsonStr=JSON.stringify([sess],null,2);
+    var blob=new Blob([jsonStr],{type:"application/json"});
+    /* 모바일: Web Share API 시도 */
+    if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
+      try{
+        var file=new File([blob],fname,{type:"application/json"});
+        if(navigator.canShare({files:[file]})){
+          navigator.share({title:"와일드콕 기록 "+sess.date,files:[file]}).catch(function(){});
+          return;
+        }
+      }catch(e){/* 무시 */}
     }
+    /* 데스크톱/폴백: exportHistory와 동일한 다운로드 */
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;a.download=fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
   };
   const exportHistory=()=>{
     const fname="records_"+new Date().toISOString().slice(0,10)+".json";
