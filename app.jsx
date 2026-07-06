@@ -662,7 +662,7 @@ function DutchPayTab({players}){
 }
 
 /* 기록실 탭 */
-function RecordsTab({history,pubHistory,onDelete,onExport,onImport}){
+function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
   const[view,setView]=useState("dashboard");
   const[selPlayer,setSelPlayer]=useState(null);
   const[expandSess,setExpandSess]=useState(null);
@@ -776,7 +776,7 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport}){
         <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--orange)"}}>{stats.synergy.length}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>시너지 조합</div></div>
       </div>
       <div className="cd">
-        <p className="sl">🏆 명예의 전당</p>
+        <p className="sl">👀 눈 여겨볼 기록</p>
         {stats.dash.topWinner&&<div className="fb" style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
           <div><div style={{fontSize:11,color:"var(--tx2)"}}>최다승</div><span style={{fontSize:15,fontWeight:700}}>🥇 {stats.dash.topWinner.name}</span></div>
           <span style={{fontSize:16,fontWeight:800,color:"var(--brand)"}}>{stats.dash.topWinner.w}승</span>
@@ -926,7 +926,10 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport}){
                 <div style={{fontSize:14,fontWeight:600}}><span style={{display:"inline-block",transition:"transform .2s",transform:isOpen?"rotate(90deg)":"rotate(0)",marginRight:6,fontSize:10}}>▶</span>{sess.date}{isPub&&<span style={{fontSize:10,fontWeight:700,color:"var(--brand)",background:"var(--brand50)",padding:"1px 6px",borderRadius:4,marginLeft:8}}>공용</span>}</div>
                 <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
               </div>
-              {!isPub&&<button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>}
+              {!isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
+                <button className="btn bs" onClick={e=>{e.stopPropagation();onShare(sess)}} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
+                <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
+              </div>}
             </div>
             {isOpen&&<div style={{paddingBottom:14,marginLeft:10,borderLeft:"2px solid var(--g3)",paddingLeft:14}}>
               {sess.matchData.map((m,mi)=>{
@@ -949,10 +952,18 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport}){
         })}
       </div>
     </div>}
+    {view==="history"&&<div className="cd" style={{marginTop:10}}>
+      <p className="sl">⚙️ 관리자 설정</p>
+      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:10}}>GitHub PAT를 설정하면 기록 저장 시 레포에 자동 push됩니다</p>
+      {(()=>{
+        const saved=typeof localStorage!=="undefined"&&localStorage.getItem("wc_gh_token");
+        return saved
+          ?<div className="fb"><span style={{fontSize:13,color:"var(--green)",fontWeight:600}}>✅ 토큰 설정됨</span><button className="btn bd" onClick={()=>{localStorage.removeItem("wc_gh_token");window.location.reload()}} style={{fontSize:11,padding:"4px 10px"}}>해제</button></div>
+          :<button className="btn bs" onClick={()=>{const t=window.prompt("GitHub Personal Access Token 입력\n(repo 권한 필요)");if(t&&t.trim()){localStorage.setItem("wc_gh_token",t.trim());window.location.reload()}}} style={{fontSize:12}}>🔑 GitHub 토큰 설정</button>;
+      })()}
+    </div>}
   </div>;
 }
-
-/* 공유 모달 */
 function ShareModal({txt,url,onClose}){
   const[cp,setCp]=useState("");
   const copy=(s,label)=>{navigator.clipboard.writeText(s).then(()=>{setCp(label);setTimeout(()=>setCp(""),2000)}).catch(()=>{})};
@@ -1155,9 +1166,57 @@ function App(){
     const dup=history.find(h=>h.date===session.date&&h.matchData.length===session.matchData.length);
     if(dup&&!window.confirm("오늘 이미 저장된 기록이 있습니다. 추가 저장할까요?"))return;
     setHistory(prev=>[session,...prev]);
-    toast.show("💾 기록 저장 완료! 기록실에서 확인하세요");
+    toast.show("💾 기록 저장 완료!");
+    /* GitHub 자동 push */
+    const ghToken=localStorage.getItem("wc_gh_token");
+    if(ghToken){pushSessionToGH(session,ghToken)}
+  };
+
+  const pushSessionToGH=(session,token)=>{
+    const REPO="zmdals/wildcock";
+    const fname=encodeURIComponent("와일드콕_기록_"+session.date+".json");
+    const apiUrl="https://api.github.com/repos/"+REPO+"/contents/history/"+fname;
+    const jsonStr=JSON.stringify([session],null,2);
+    const content=btoa(unescape(encodeURIComponent(jsonStr)));
+    /* 파일 존재 여부 확인 (같은 날짜 → 병합) */
+    fetch(apiUrl,{headers:{Authorization:"token "+token}})
+      .then(r=>r.ok?r.json():null)
+      .then(existing=>{
+        let body;
+        if(existing&&existing.sha){
+          /* 기존 파일이 있으면: 기존 내용 + 새 세션 병합 */
+          try{
+            const oldContent=JSON.parse(decodeURIComponent(escape(atob(existing.content.replace(/\n/g,"")))));
+            const merged=Array.isArray(oldContent)?[...oldContent,session]:[oldContent,session];
+            const unique=[...new Map(merged.map(s=>[s.id,s])).values()];
+            const newContent=btoa(unescape(encodeURIComponent(JSON.stringify(unique,null,2))));
+            body={message:"기록 업데이트: "+session.date,content:newContent,sha:existing.sha};
+          }catch{
+            body={message:"기록 추가: "+session.date,content,sha:existing.sha};
+          }
+        }else{
+          body={message:"기록 추가: "+session.date,content};
+        }
+        return fetch(apiUrl,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+      })
+      .then(r=>{if(r.ok){toast.show("☁️ GitHub에 자동 저장 완료!")}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
+      .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
+  const shareSession=(sess)=>{
+    const fname="와일드콕_기록_"+sess.date+".json";
+    const jsonStr=JSON.stringify([sess],null,2);
+    const blob=new Blob([jsonStr],{type:"application/json"});
+    const file=new File([blob],fname,{type:"application/json"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      navigator.share({title:"와일드콕 기록 "+sess.date,text:sess.date+" 매치 기록 ("+sess.matchData.length+"경기)",files:[file]}).catch(()=>{});
+    }else{
+      /* 파일 공유 미지원 시 다운로드 폴백 */
+      const url=URL.createObjectURL(blob);const a=document.createElement("a");
+      a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+      toast.show("📥 파일 다운로드됨 — 관리자에게 전달해주세요");
+    }
+  };
   const exportHistory=()=>{
     const blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
@@ -1460,12 +1519,22 @@ function App(){
               <div style={{fontSize:15,fontWeight:800,color:"var(--brand)",marginBottom:8}}>🎉 모든 매치 완료!</div>
               <p style={{fontSize:12,color:"var(--tx2)",marginBottom:14}}>기록실에 저장하면 누적 통계에 반영됩니다.</p>
               <button className="btn bgn bf" onClick={saveSession} style={{fontSize:15,padding:"12px 24px"}}>💾 기록실에 저장</button>
+              <button className="btn bs" onClick={()=>{
+                const sess={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize,mt,
+                  players:players.map(p=>({name:p.name,skill:p.skill,gender:p.gender})),
+                  matchData:matches.map(rd=>rd.matches.map(m=>({
+                    t1:(m.team1.players||[]).map(p=>p.name),t2:(m.team2.players||[]).map(p=>p.name),
+                    s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)
+                  }))).flat()};
+                shareSession(sess);
+              }} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
+              <p style={{fontSize:11,color:"var(--tx2)",marginTop:8}}>관리자 부재 시: 저장 후 전송 버튼으로 카톡 전달</p>
             </div>}
           </>}
         </div>}
       </div>}
 
-      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onExport={exportHistory} onImport={importHistory} />}
+      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onExport={exportHistory} onImport={importHistory} onShare={shareSession} />}
 
       {mainTab==="roulette"&&<div>
         <div className="cd">
