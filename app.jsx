@@ -1005,10 +1005,18 @@ function SharedView({data}){
   const sRank=useMemo(function(){
     if(!hasScore)return[];
     var m={};
-    (data.t||[]).forEach(function(t){var k=t.p.map(function(x){return x.n}).sort().join("|");m[k]={name:t.p.map(function(x){return x.n}).join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:!!t.b}});
+    /* 와일드카드 선수 식별 — 보너스 팀의 첫 번째 선수 */
+    var wcPlayer=null;
+    (data.t||[]).forEach(function(t){if(t.b&&t.p.length>0)wcPlayer=t.p[0].n});
+    /* 팀 키 생성: 와일드카드 포함 팀은 "wc"로 통합 */
+    function tKey(names){if(wcPlayer&&names.indexOf(wcPlayer)>=0)return"wc";return[].concat(names).sort().join("|")}
+    (data.t||[]).forEach(function(t){
+      if(t.b){if(wcPlayer)m["wc"]={name:wcPlayer+" ⭐",w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:true}}
+      else{var k=t.p.map(function(x){return x.n}).sort().join("|");m[k]={name:t.p.map(function(x){return x.n}).join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}}}
+    });
     allM.forEach(function(x){
       var a=parseInt(x.s1,10),b=parseInt(x.s2,10);if(isNaN(a)||isNaN(b))return;
-      var k1=[].concat(x.a).sort().join("|"),k2=[].concat(x.b).sort().join("|");
+      var k1=tKey(x.a),k2=tKey(x.b);
       if(!m[k1])m[k1]={name:x.a.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
       if(!m[k2])m[k2]={name:x.b.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
       m[k1].pf+=a;m[k1].pa+=b;m[k2].pf+=b;m[k2].pa+=a;
@@ -1174,7 +1182,7 @@ function App(){
 
   const pushSessionToGH=(session,token)=>{
     const REPO="zmdals/wildcock";
-    const fname=encodeURIComponent("와일드콕_기록_"+session.date+".json");
+    const fname="record_"+session.date+".json";
     const apiUrl="https://api.github.com/repos/"+REPO+"/contents/history/"+fname;
     const jsonStr=JSON.stringify([session],null,2);
     const content=btoa(unescape(encodeURIComponent(jsonStr)));
@@ -1204,7 +1212,7 @@ function App(){
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
   const shareSession=(sess)=>{
-    const fname="와일드콕_기록_"+sess.date+".json";
+    const fname="wildcock_record_"+sess.date+".json";
     const jsonStr=JSON.stringify([sess],null,2);
     const blob=new Blob([jsonStr],{type:"application/json"});
     const file=new File([blob],fname,{type:"application/json"});
@@ -1220,7 +1228,7 @@ function App(){
   const exportHistory=()=>{
     const blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
-    a.href=url;a.download="와일드콕_기록_"+new Date().toISOString().slice(0,10)+".json";
+    a.href=url;a.download="wildcock_records_"+new Date().toISOString().slice(0,10)+".json";
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
     toast.show("📥 백업 파일 다운로드됨");
   };
