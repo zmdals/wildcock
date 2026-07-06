@@ -662,17 +662,25 @@ function DutchPayTab({players}){
 }
 
 /* 기록실 탭 */
-function RecordsTab({history,onDelete,onExport,onImport}){
+function RecordsTab({history,pubHistory,onDelete,onExport,onImport}){
   const[view,setView]=useState("dashboard");
   const[selPlayer,setSelPlayer]=useState(null);
   const[expandSess,setExpandSess]=useState(null);
+
+  /* 공용 + 개인 기록 병합 (id 기준 중복 제거) */
+  const allHistory=useMemo(()=>{
+    const merged=[...history.map(s=>({...s,_pub:false})),...(pubHistory||[]).map(s=>({...s,_pub:true}))];
+    const unique=[...new Map(merged.map(s=>[s.id,s])).values()];
+    unique.sort((a,b)=>b.id-a.id);
+    return unique;
+  },[history,pubHistory]);
 
   const stats=useMemo(()=>{
     const pm={};
     const h2h={};
     const syn={};
 
-    history.forEach(sess=>{
+    allHistory.forEach(sess=>{
       const sessionPlayers=new Set();
       sess.matchData.forEach(m=>{
         const t1=m.t1,t2=m.t2;
@@ -728,19 +736,19 @@ function RecordsTab({history,onDelete,onExport,onImport}){
     });
 
     /* 종합 대시보드 */
-    const totalSessions=history.length;
-    const totalGames=history.reduce((s,x)=>s+x.matchData.filter(m=>!isNaN(m.s1)&&!isNaN(m.s2)).length,0);
+    const totalSessions=allHistory.length;
+    const totalGames=allHistory.reduce((s,x)=>s+x.matchData.filter(m=>!isNaN(m.s1)&&!isNaN(m.s2)).length,0);
     const topWinner=playerArr.length?playerArr.reduce((a,b)=>b.w>a.w?b:a):null;
     const topRate=playerArr.filter(p=>p.games>=3).length?playerArr.filter(p=>p.games>=3).reduce((a,b)=>b.rate>a.rate?b:a):null;
     const mostActive=playerArr.length?playerArr.reduce((a,b)=>b.sessCnt>a.sessCnt?b:a):null;
 
     return{players:playerArr,h2h,synergy:synArr,dash:{totalSessions,totalGames,topWinner,topRate,mostActive}};
-  },[history]);
+  },[allHistory]);
 
   const allNames=stats.players.map(p=>p.name);
   const fileRef=useRef(null);
 
-  if(!history.length)return <div className="cd es">
+  if(!allHistory.length)return <div className="cd es">
     <div className="es-i">📊</div>
     <div className="es-t">저장된 기록이 없습니다</div>
     <p style={{fontSize:13,color:"var(--tx2)",marginTop:8,textAlign:"center"}}>매치를 모두 완료한 후 "기록실에 저장"을 눌러주세요</p>
@@ -886,17 +894,18 @@ function RecordsTab({history,onDelete,onExport,onImport}){
     {view==="history"&&<div>
       <div className="cd">
         <div className="fb" style={{marginBottom:10}}>
-          <p className="sl" style={{margin:0}}>📅 기록 목록 ({history.length}건)</p>
+          <p className="sl" style={{margin:0}}>📅 기록 목록 ({allHistory.length}건{pubHistory&&pubHistory.length>0?" · 공용 "+pubHistory.length:""})</p>
           <div className="fg" style={{gap:6}}>
             <input type="file" accept=".json" ref={fileRef} onChange={onImport} style={{display:"none"}} />
             <button className="btn bs" onClick={()=>fileRef.current?.click()} style={{fontSize:11,padding:"4px 10px"}}>📂 가져오기</button>
             <button className="btn bs" onClick={onExport} style={{fontSize:11,padding:"4px 10px"}}>📥 백업</button>
           </div>
         </div>
-        {history.map(sess=>{
+        {allHistory.map(sess=>{
           const names=new Set();
           sess.matchData.forEach(m=>{[...m.t1,...m.t2].forEach(n=>names.add(n))});
           const isOpen=expandSess===sess.id;
+          const isPub=!!sess._pub;
           /* 세션 내 순위 계산 */
           const sessRank=(()=>{
             if(!isOpen)return[];
@@ -914,10 +923,10 @@ function RecordsTab({history,onDelete,onExport,onImport}){
           return <div key={sess.id} style={{borderBottom:"1px solid var(--g3)"}}>
             <div className="fb" style={{padding:"12px 0",cursor:"pointer"}} onClick={()=>setExpandSess(isOpen?null:sess.id)}>
               <div>
-                <div style={{fontSize:14,fontWeight:600}}><span style={{display:"inline-block",transition:"transform .2s",transform:isOpen?"rotate(90deg)":"rotate(0)",marginRight:6,fontSize:10}}>▶</span>{sess.date}</div>
+                <div style={{fontSize:14,fontWeight:600}}><span style={{display:"inline-block",transition:"transform .2s",transform:isOpen?"rotate(90deg)":"rotate(0)",marginRight:6,fontSize:10}}>▶</span>{sess.date}{isPub&&<span style={{fontSize:10,fontWeight:700,color:"var(--brand)",background:"var(--brand50)",padding:"1px 6px",borderRadius:4,marginLeft:8}}>공용</span>}</div>
                 <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
               </div>
-              <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>
+              {!isPub&&<button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>}
             </div>
             {isOpen&&<div style={{paddingBottom:14,marginLeft:10,borderLeft:"2px solid var(--g3)",paddingLeft:14}}>
               {sess.matchData.map((m,mi)=>{
@@ -1086,7 +1095,30 @@ function App(){
 
   /* 기록실 */
   const[history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem("bp_history"))||[]}catch{return[]}});
+  const[pubHistory,setPubHistory]=useState([]);
   useEffect(()=>{try{localStorage.setItem("bp_history",JSON.stringify(history))}catch{}},[history]);
+
+  /* 공용 기록: GitHub 레포 history/ 폴더에서 자동 로드 */
+  useEffect(()=>{
+    const REPO="zmdals/wildcock";
+    const DIR="history";
+    fetch("https://api.github.com/repos/"+REPO+"/contents/"+DIR)
+      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+      .then(files=>{
+        const jsons=files.filter(f=>f.name.endsWith(".json"));
+        if(!jsons.length)return;
+        return Promise.all(jsons.map(f=>
+          fetch(DIR+"/"+f.name).then(r=>r.ok?r.json():null).catch(()=>null)
+        ));
+      })
+      .then(results=>{
+        if(!results)return;
+        const all=[];
+        results.forEach(d=>{if(!d)return;(Array.isArray(d)?d:[d]).forEach(s=>{if(s&&s.matchData)all.push({...s,_pub:true})})});
+        setPubHistory(all);
+      })
+      .catch(()=>{/* 네트워크 오류 무시 — localStorage 기록만 사용 */});
+  },[]);
 
   useEffect(()=>{try{localStorage.setItem("bp",JSON.stringify(players))}catch{}},[players]);
   useEffect(()=>{try{localStorage.setItem("bp_session",JSON.stringify({teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,restMode,wcMode,matches,subTab}))}catch{}},[teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,restMode,wcMode,matches,subTab]);
@@ -1433,7 +1465,7 @@ function App(){
         </div>}
       </div>}
 
-      {mainTab==="records"&&<RecordsTab history={history} onDelete={delSession} onExport={exportHistory} onImport={importHistory} />}
+      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onExport={exportHistory} onImport={importHistory} />}
 
       {mainTab==="roulette"&&<div>
         <div className="cd">
