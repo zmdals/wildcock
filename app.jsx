@@ -1085,13 +1085,6 @@ function App(){
     if(!document.getElementById("wc-styles")){
       const s=document.createElement("style");s.id="wc-styles";s.textContent=CSS;document.head.appendChild(s);
     }
-    /* favicon 동적 주입 — DC 런타임 부팅 후에도 확실히 적용 */
-    if(!document.getElementById("wc-favicon")){
-      const old=document.querySelector('link[rel="icon"],link[rel="shortcut icon"]');
-      if(old)old.remove();
-      const lnk=document.createElement("link");lnk.id="wc-favicon";lnk.rel="icon";lnk.href="/wildcock/uploads/favicon_32.png";
-      document.head.appendChild(lnk);
-    }
   },[]);
 
   const toast=useToast();
