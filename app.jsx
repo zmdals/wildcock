@@ -938,7 +938,7 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
                 <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
               </div>
               {!isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
-                <button className="btn bs" onClick={function(e){e.stopPropagation();var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
+                <button className="btn bs" onClick={function(e){e.stopPropagation();onShare(sess)}} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
                 <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
               </div>}
             </div>
@@ -1225,21 +1225,18 @@ function App(){
       .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
-  const shareSession=function(sess){
-    var fname="record_"+sess.date+".json";
-    var jsonStr=JSON.stringify([sess],null,2);
-    var blob=new Blob([jsonStr],{type:"application/json"});
-    /* 모바일: Web Share API 시도 */
+  var shareOrDownload=function(blob,fname,title,toastMsg){
+    /* 모바일/태블릿: Web Share API */
     if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
       try{
-        var file=new File([blob],fname,{type:"application/json"});
+        var file=new File([blob],fname,{type:blob.type||"application/json"});
         if(navigator.canShare({files:[file]})){
-          navigator.share({title:"와일드콕 기록 "+sess.date,files:[file]}).catch(function(){});
+          navigator.share({title:title||fname,files:[file]}).catch(function(){});
           return;
         }
       }catch(e){/* 무시 */}
     }
-    /* 데스크톱/폴백: exportHistory와 동일한 다운로드 */
+    /* 데스크톱/폴백: 안내 + 다운로드 */
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");
     a.href=url;a.download=fname;
@@ -1247,14 +1244,17 @@ function App(){
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
+    toast.show(toastMsg||"📥 "+fname+" 다운로드 완료");
   };
-  const exportHistory=()=>{
-    const fname="records_"+new Date().toISOString().slice(0,10)+".json";
-    const blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");
-    a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    toast.show("📥 "+fname+" 다운로드 완료");
+  const shareSession=function(sess){
+    var fname="record_"+sess.date+".json";
+    var blob=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
+    shareOrDownload(blob,fname,"와일드콕 기록 "+sess.date,"📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
+  };
+  const exportHistory=function(){
+    var fname="records_"+new Date().toISOString().slice(0,10)+".json";
+    var blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
+    shareOrDownload(blob,fname,"와일드콕 기록 백업","📥 "+fname+" 다운로드 완료");
   };
   const importHistory=(e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -1557,7 +1557,9 @@ function App(){
                   matchData:matches.map(function(rd){return rd.matches.map(function(m){return{
                     t1:(m.team1.players||[]).map(function(p){return p.name}),t2:(m.team2.players||[]).map(function(p){return p.name}),
                     s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)}})}).flat()};
-                var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+                var fn="record_"+sess.date+".json";
+                var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
+                shareOrDownload(bl,fn,"와일드콕 기록 "+sess.date,"📥 "+fn+" 다운로드 완료 — 관리자에게 전달해주세요");
               }} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
               <p style={{fontSize:11,color:"var(--tx2)",marginTop:8}}>관리자 부재 시: 저장 후 전송 버튼으로 카톡 전달</p>
             </div>}
@@ -1575,7 +1577,7 @@ function App(){
           :<div style={{fontSize:14,color:"var(--tx2)",padding:"10px 0"}}>{players.length?`${players.length}명: ${players.map(p=>p.name).join(", ")}`:"선수 없음"}</div>}
         </div>
         <div className="cd"><p className="sl">뽑기 설정</p><div className="fg" style={{marginBottom:12}}><label style={{fontSize:14,fontWeight:600}}>인원:</label><select className="inp" value={rCnt} onChange={e=>setRC(+e.target.value)} style={{width:70,padding:"8px 10px",textAlign:"center"}}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}명</option>)}</select></div></div>
-        {rPool.length>0?<VirusLottery pool={rPool} count={rCnt} />:<div className="cd es"><div className="es-i">🎴</div><div className="es-t">대상자를 추가해주세요</div></div>}
+        {rPool.length>0?<VirusLottery pool={rPool} count={rCnt} />:<div className="cd es"><div className="es-i">🎲</div><div className="es-t">대상자를 추가해주세요</div></div>}
       </div>}
 
       {mainTab==="dutch"&&<DutchPayTab players={players} />}
