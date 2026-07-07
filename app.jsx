@@ -849,7 +849,7 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
           <div className="rb" style={{marginTop:8,height:5}}><div className="rf" style={{width:bar+"%",background:bar>=60?"var(--green)":bar>=40?"var(--pri)":"var(--danger)"}} /></div>
           {p.trend.length>1&&<div style={{marginTop:8,display:"flex",gap:3,alignItems:"end",height:28}}>
             {p.trend.map((t,ti)=>{const h=Math.max(4,t.rate/100*24);
-              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",maxWidth:20,transition:"opacity .2s"}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.7} />
+              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",transition:"opacity .2s"}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.7} />
             })}
           </div>}
           {p.trend.length>1&&<div style={{fontSize:10,color:"var(--tx2)",marginTop:2,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span style={{color:"var(--g1)"}}>← 세션별 승률 →</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>}
@@ -938,7 +938,11 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
                 <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
               </div>
               {!isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
-                <button className="btn bs" onClick={e=>{e.stopPropagation();onShare(sess)}} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
+                <button className="btn bs" onClick={function(e){e.stopPropagation();
+                  var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
+                  try{var fi=new File([bl],fn,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[fi]})){navigator.share({title:fn,files:[fi]});return}}catch(ex){}
+                  var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+                }} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
                 <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
               </div>}
             </div>
@@ -1548,14 +1552,15 @@ function App(){
               <div style={{fontSize:15,fontWeight:800,color:"var(--brand)",marginBottom:8}}>🎉 모든 매치 완료!</div>
               <p style={{fontSize:12,color:"var(--tx2)",marginBottom:14}}>기록실에 저장하면 누적 통계에 반영됩니다.</p>
               <button className="btn bgn bf" onClick={saveSession} style={{fontSize:15,padding:"12px 24px"}}>💾 기록실에 저장</button>
-              <button className="btn bs" onClick={()=>{
-                const sess={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize,mt,
-                  players:players.map(p=>({name:p.name,skill:p.skill,gender:p.gender})),
-                  matchData:matches.map(rd=>rd.matches.map(m=>({
-                    t1:(m.team1.players||[]).map(p=>p.name),t2:(m.team2.players||[]).map(p=>p.name),
-                    s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)
-                  }))).flat()};
-                shareSession(sess);
+              <button className="btn bs" onClick={function(){
+                var sess={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize:teamSize,mt:mt,
+                  players:players.map(function(p){return{name:p.name,skill:p.skill,gender:p.gender}}),
+                  matchData:matches.map(function(rd){return rd.matches.map(function(m){return{
+                    t1:(m.team1.players||[]).map(function(p){return p.name}),t2:(m.team2.players||[]).map(function(p){return p.name}),
+                    s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)}})}).flat()};
+                var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
+                try{var fi=new File([bl],fn,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[fi]})){navigator.share({title:fn,files:[fi]});return}}catch(ex){}
+                var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
               }} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
               <p style={{fontSize:11,color:"var(--tx2)",marginTop:8}}>관리자 부재 시: 저장 후 전송 버튼으로 카톡 전달</p>
             </div>}
