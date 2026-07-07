@@ -847,12 +847,12 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
             </div>
           </div>
           <div className="rb" style={{marginTop:8,height:5}}><div className="rf" style={{width:bar+"%",background:bar>=60?"var(--green)":bar>=40?"var(--pri)":"var(--danger)"}} /></div>
-          {p.trend.length>1&&<div style={{marginTop:8,display:"flex",gap:3,alignItems:"end",height:28}}>
-            {p.trend.map((t,ti)=>{const h=Math.max(4,t.rate/100*24);
-              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",transition:"opacity .2s"}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.7} />
+          {p.trend.length>1&&<div style={{marginTop:6,display:"flex",gap:2,alignItems:"end",height:18}}>
+            {p.trend.map((t,ti)=>{var h=Math.max(3,t.rate/100*16);
+              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",transition:"opacity .2s"}} onMouseEnter={function(e){e.target.style.opacity=1}} onMouseLeave={function(e){e.target.style.opacity=.7}} />
             })}
           </div>}
-          {p.trend.length>1&&<div style={{fontSize:10,color:"var(--tx2)",marginTop:2,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span style={{color:"var(--g1)"}}>← 세션별 승률 →</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>}
+          {p.trend.length>1&&<div style={{fontSize:10,color:"var(--tx3)",marginTop:1,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>}
         </div>
       })}
     </div>}
@@ -1446,12 +1446,14 @@ function App(){
             <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>선수 목록</p><div className="fg"><span style={{fontSize:13,color:"var(--tx2)",fontWeight:600}}>{players.length}명</span>{players.length>0&&<button className="btn bd" onClick={resetAll} style={{padding:"4px 10px",fontSize:11}}>전체 초기화</button>}</div></div>
             {!players.length?<div className="es"><div className="es-i">👤</div><div className="es-t">선수를 추가해주세요</div><div className="es-s">최소 {minPlayers}명</div></div>:
             players.map((p,i)=><div key={p.id} className="ri">
-              {eid===p.id?<>
-                <input className="inp" value={en} onChange={e=>setEn(e.target.value)} style={{flex:1,padding:"7px 10px",fontSize:14,background:"var(--card)"}} autoFocus onKeyDown={e=>{if(e.key==="Enter")saveE();if(e.key==="Escape")setEid(null)}} />
-                <SkB value={esk} onChange={setEsk} small /><GenB value={eg} onChange={setEg} small />
-                <button className="btn bs" onClick={saveE} style={{padding:"5px 12px",fontSize:12}}>저장</button>
-                <button className="btn bd" onClick={()=>setEid(null)} style={{padding:"5px 8px",fontSize:12}}>취소</button>
-              </>:<>
+              {eid===p.id?<div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
+                <input className="inp" value={en} onChange={e=>setEn(e.target.value)} style={{width:"100%",padding:"9px 12px",fontSize:15,background:"var(--card)",boxSizing:"border-box"}} autoFocus onKeyDown={e=>{if(e.key==="Enter")saveE();if(e.key==="Escape")setEid(null)}} />
+                <div className="fg" style={{gap:8,flexWrap:"wrap"}}>
+                  <SkB value={esk} onChange={setEsk} small /><GenB value={eg} onChange={setEg} small />
+                  <button className="btn bs" onClick={saveE} style={{padding:"5px 12px",fontSize:12}}>저장</button>
+                  <button className="btn bd" onClick={()=>setEid(null)} style={{padding:"5px 8px",fontSize:12}}>취소</button>
+                </div>
+              </div>:<>
                 <span style={{fontSize:12,color:"var(--tx3)",fontWeight:700,width:20,textAlign:"center"}}>{i+1}</span>
                 <span style={{flex:1,fontSize:14,fontWeight:600}}>{p.name}</span>
                 <GBadge gender={p.gender} /><Badge level={p.skill} />
