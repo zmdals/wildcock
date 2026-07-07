@@ -847,12 +847,14 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
             </div>
           </div>
           <div className="rb" style={{marginTop:8,height:5}}><div className="rf" style={{width:bar+"%",background:bar>=60?"var(--green)":bar>=40?"var(--pri)":"var(--danger)"}} /></div>
-          {p.trend.length>1&&<div style={{marginTop:6,display:"flex",gap:2,alignItems:"end",height:18}}>
-            {p.trend.map((t,ti)=>{var h=Math.max(3,t.rate/100*16);
+          {p.trend.length>1&&<div style={{marginTop:6,maxWidth:160}}>
+            <div style={{display:"flex",gap:2,alignItems:"end",height:18}}>
+            {p.trend.map(function(t,ti){var h=Math.max(3,t.rate/100*16);
               return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",transition:"opacity .2s"}} onMouseEnter={function(e){e.target.style.opacity=1}} onMouseLeave={function(e){e.target.style.opacity=.7}} />
             })}
+            </div>
+            <div style={{fontSize:10,color:"var(--tx3)",marginTop:1,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>
           </div>}
-          {p.trend.length>1&&<div style={{fontSize:10,color:"var(--tx3)",marginTop:1,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>}
         </div>
       })}
     </div>}
