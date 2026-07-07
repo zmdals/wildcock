@@ -661,42 +661,17 @@ function DutchPayTab({players}){
   );
 }
 
-/* 대시보드 기록 항목 — 3명 이상 시 접기/펼치기 */
-function DashRecord({label,icon,items,color}){
-  const[open,setOpen]=useState(false);
-  const LIMIT=2;
-  const show=open?items:items.slice(0,LIMIT);
-  const more=items.length>LIMIT;
-  return <div style={{padding:"10px 0",borderBottom:"1px solid var(--g3)"}}>
-    <div style={{fontSize:11,color:"var(--tx2)",marginBottom:4}}>{label}{items.length>1&&<span style={{marginLeft:4,fontSize:10,color:color,fontWeight:700}}>공동 {items.length}명</span>}</div>
-    {show.map(function(p,i){return <div key={p.name} className="fb" style={{marginTop:i>0?4:0}}>
-      <span style={{fontSize:15,fontWeight:700}}>{icon} {p.name}</span>
-      <span style={{fontSize:16,fontWeight:800,color:color}}>{p.val}</span>
-    </div>})}
-    {more&&<button onClick={function(){setOpen(!open)}} style={{background:"none",border:"none",fontSize:11,color:"var(--tx2)",cursor:"pointer",padding:"6px 0",width:"100%",textAlign:"center"}}>{open?"접기 ▲":"+"+(items.length-LIMIT)+"명 더보기 ▼"}</button>}
-  </div>;
-}
-
 /* 기록실 탭 */
-function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
-  const[view,setView]=useState("dashboard");
+function RecordsTab({history,onDelete,onExport,onImport}){
+  const[view,setView]=useState("stats");
   const[selPlayer,setSelPlayer]=useState(null);
-  const[expandSess,setExpandSess]=useState(null);
-
-  /* 공용 + 개인 기록 병합 (id 기준 중복 제거) */
-  const allHistory=useMemo(()=>{
-    const merged=[...history.map(s=>({...s,_pub:false})),...(pubHistory||[]).map(s=>({...s,_pub:true}))];
-    const unique=[...new Map(merged.map(s=>[s.id,s])).values()];
-    unique.sort((a,b)=>b.id-a.id);
-    return unique;
-  },[history,pubHistory]);
 
   const stats=useMemo(()=>{
     const pm={};
     const h2h={};
     const syn={};
 
-    allHistory.forEach(sess=>{
+    history.forEach(sess=>{
       const sessionPlayers=new Set();
       sess.matchData.forEach(m=>{
         const t1=m.t1,t2=m.t2;
@@ -741,9 +716,8 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
 
     const playerArr=Object.entries(pm).map(([name,d])=>{
       const rate=d.games?Math.round(d.w/d.games*100):0;
-      const sessCnt=Object.keys(d.sessions).length;
       const trend=Object.entries(d.sessions).sort(([a],[b])=>a.localeCompare(b)).map(([date,r])=>({date,w:r.w,l:r.l,rate:r.w+r.l+r.d>0?Math.round(r.w/(r.w+r.l+r.d)*100):0}));
-      return{name,...d,rate,sessCnt,trend};
+      return{name,...d,rate,trend};
     }).sort((a,b)=>b.rate-a.rate||b.games-a.games);
 
     const synArr=Object.values(syn).filter(s=>s.games>=2).sort((a,b)=>{
@@ -751,24 +725,13 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
       return rb-ra||b.games-a.games;
     });
 
-    /* 종합 대시보드 — 공동 순위 처리 */
-    const totalSessions=allHistory.length;
-    const totalGames=allHistory.reduce((s,x)=>s+x.matchData.filter(m=>!isNaN(m.s1)&&!isNaN(m.s2)).length,0);
-    const maxW=playerArr.length?Math.max(...playerArr.map(p=>p.w)):0;
-    const topWinners=playerArr.filter(p=>p.w===maxW&&maxW>0);
-    const rated=playerArr.filter(p=>p.games>=3);
-    const maxRate=rated.length?Math.max(...rated.map(p=>p.rate)):0;
-    const topRates=rated.filter(p=>p.rate===maxRate&&maxRate>0);
-    const maxSess=playerArr.length?Math.max(...playerArr.map(p=>p.sessCnt)):0;
-    const mostActives=playerArr.filter(p=>p.sessCnt===maxSess&&maxSess>0);
-
-    return{players:playerArr,h2h,synergy:synArr,dash:{totalSessions,totalGames,topWinners,topRates,mostActives}};
-  },[allHistory]);
+    return{players:playerArr,h2h,synergy:synArr};
+  },[history]);
 
   const allNames=stats.players.map(p=>p.name);
   const fileRef=useRef(null);
 
-  if(!allHistory.length)return <div className="cd es">
+  if(!history.length)return <div className="cd es">
     <div className="es-i">📊</div>
     <div className="es-t">저장된 기록이 없습니다</div>
     <p style={{fontSize:13,color:"var(--tx2)",marginTop:8,textAlign:"center"}}>매치를 모두 완료한 후 "기록실에 저장"을 눌러주세요</p>
@@ -780,57 +743,11 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
 
   return <div>
     <div className="fg" style={{marginBottom:14,gap:6,flexWrap:"wrap"}}>
-      <button className={"pill "+(view==="dashboard"?"p-on":"p-off")} onClick={()=>setView("dashboard")}>🏠 종합</button>
-      <button className={"pill "+(view==="stats"?"p-on":"p-off")} onClick={()=>setView("stats")}>👤 개인</button>
-      <button className={"pill "+(view==="attendance"?"p-on":"p-off")} onClick={()=>setView("attendance")}>📋 참여</button>
-      <button className={"pill "+(view==="h2h"?"p-on":"p-off")} onClick={()=>setView("h2h")}>⚔️ 상대</button>
+      <button className={"pill "+(view==="stats"?"p-on":"p-off")} onClick={()=>setView("stats")}>👤 개인 통계</button>
+      <button className={"pill "+(view==="h2h"?"p-on":"p-off")} onClick={()=>setView("h2h")}>⚔️ 상대 전적</button>
       <button className={"pill "+(view==="synergy"?"p-on":"p-off")} onClick={()=>setView("synergy")}>🤝 시너지</button>
-      <button className={"pill "+(view==="history"?"p-on":"p-off")} onClick={()=>setView("history")}>📅 기록</button>
+      <button className={"pill "+(view==="history"?"p-on":"p-off")} onClick={()=>setView("history")}>📅 기록 목록</button>
     </div>
-
-    {view==="dashboard"&&<div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--brand)"}}>{stats.dash.totalSessions}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>총 세션</div></div>
-        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--pri)"}}>{stats.dash.totalGames}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>총 경기</div></div>
-        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--green)"}}>{stats.players.length}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>등록 선수</div></div>
-        <div className="cd" style={{textAlign:"center",padding:"16px 10px"}}><div style={{fontSize:24,fontWeight:800,color:"var(--orange)"}}>{stats.synergy.length}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>시너지 조합</div></div>
-      </div>
-      <div className="cd">
-        <p className="sl">👀 눈 여겨볼 기록</p>
-        {stats.dash.topWinners.length>0&&<DashRecord label="최다승" icon="🥇" items={stats.dash.topWinners.map(function(p){return{name:p.name,val:p.w+"승"}})} color="var(--brand)" />}
-        {stats.dash.topRates.length>0&&<DashRecord label="최고 승률 (3경기+)" icon="🎯" items={stats.dash.topRates.map(function(p){return{name:p.name,val:p.rate+"%"}})} color="var(--green)" />}
-        {stats.dash.mostActives.length>0&&<DashRecord label="최다 참여" icon="🔥" items={stats.dash.mostActives.map(function(p){return{name:p.name,val:p.sessCnt+"회"}})} color="var(--orange)" />}
-      </div>
-      {stats.synergy.length>0&&<div className="cd" style={{marginTop:10}}>
-        <p className="sl">🤝 베스트 콤비</p>
-        {stats.synergy.slice(0,3).map((s,i)=>{const pct=Math.round(s.w/s.games*100);
-          return <div key={i} className="fb" style={{padding:"8px 0",borderBottom:i<2?"1px solid var(--g3)":"none"}}>
-            <span style={{fontSize:13,fontWeight:600}}>{["🥇","🥈","🥉"][i]} {s.names[0]} + {s.names[1]}</span>
-            <span style={{fontSize:13,fontWeight:700,color:"var(--green)"}}>{pct}% ({s.games}전)</span>
-          </div>})}
-      </div>}
-    </div>}
-
-    {view==="attendance"&&<div className="cd">
-      <p className="sl">📋 참여율 ({stats.players.length}명)</p>
-      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>총 {stats.dash.totalSessions}세션 기준 · 참석 횟수순</p>
-      {[...stats.players].sort((a,b)=>b.sessCnt-a.sessCnt||b.games-a.games).map((p,i)=>{
-        const pct=stats.dash.totalSessions?Math.round(p.sessCnt/stats.dash.totalSessions*100):0;
-        return <div key={p.name} style={{padding:"10px 0",borderBottom:i<stats.players.length-1?"1px solid var(--g3)":"none"}}>
-          <div className="fb">
-            <div>
-              <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
-              <div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>{p.sessCnt}회 참석 · {p.games}경기 · {p.w}승 {p.l}패</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:17,fontWeight:800,color:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--tx2)"}}>{pct}%</div>
-              <div style={{fontSize:10,color:"var(--tx2)"}}>출석</div>
-            </div>
-          </div>
-          <div className="rb" style={{marginTop:6,height:4}}><div className="rf" style={{width:pct+"%",background:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--g2)"}} /></div>
-        </div>
-      })}
-    </div>}
 
     {view==="stats"&&<div className="cd">
       <p className="sl">👤 개인 통계 ({stats.players.length}명)</p>
@@ -849,7 +766,7 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
           <div className="rb" style={{marginTop:8,height:5}}><div className="rf" style={{width:bar+"%",background:bar>=60?"var(--green)":bar>=40?"var(--pri)":"var(--danger)"}} /></div>
           {p.trend.length>1&&<div style={{marginTop:8,display:"flex",gap:3,alignItems:"end",height:28}}>
             {p.trend.map((t,ti)=>{const h=Math.max(4,t.rate/100*24);
-              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",transition:"opacity .2s"}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.7} />
+              return <div key={ti} title={t.date+": "+t.rate+"%"} style={{flex:1,height:h,borderRadius:2,background:t.rate>=60?"var(--green)":t.rate>=40?"var(--pri)":"var(--danger)",opacity:.7,cursor:"help",maxWidth:20,transition:"opacity .2s"}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.7} />
             })}
           </div>}
           {p.trend.length>1&&<div style={{fontSize:10,color:"var(--tx2)",marginTop:2,display:"flex",justifyContent:"space-between"}}><span>{p.trend[0].date.slice(5)}</span><span style={{color:"var(--g1)"}}>← 세션별 승률 →</span><span>{p.trend[p.trend.length-1].date.slice(5)}</span></div>}
@@ -905,80 +822,33 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
     {view==="history"&&<div>
       <div className="cd">
         <div className="fb" style={{marginBottom:10}}>
-          <p className="sl" style={{margin:0}}>📅 기록 목록 ({allHistory.length}건{pubHistory&&pubHistory.length>0?" · 공용 "+pubHistory.length:""})</p>
+          <p className="sl" style={{margin:0}}>📅 기록 목록 ({history.length}건)</p>
           <div className="fg" style={{gap:6}}>
             <input type="file" accept=".json" ref={fileRef} onChange={onImport} style={{display:"none"}} />
             <button className="btn bs" onClick={()=>fileRef.current?.click()} style={{fontSize:11,padding:"4px 10px"}}>📂 가져오기</button>
             <button className="btn bs" onClick={onExport} style={{fontSize:11,padding:"4px 10px"}}>📥 백업</button>
           </div>
         </div>
-        {allHistory.map(sess=>{
+        {history.map(sess=>{
           const names=new Set();
           sess.matchData.forEach(m=>{[...m.t1,...m.t2].forEach(n=>names.add(n))});
-          const isOpen=expandSess===sess.id;
-          const isPub=!!sess._pub;
-          /* 세션 내 순위 계산 */
-          const sessRank=(()=>{
-            if(!isOpen)return[];
-            const rm={};
-            sess.matchData.forEach(m=>{
-              const s1=m.s1,s2=m.s2;if(isNaN(s1)||isNaN(s2))return;
-              const k1=[...m.t1].sort().join("|"),k2=[...m.t2].sort().join("|");
-              if(!rm[k1])rm[k1]={name:m.t1.join(" · "),w:0,l:0,pts:0,pf:0,pa:0};
-              if(!rm[k2])rm[k2]={name:m.t2.join(" · "),w:0,l:0,pts:0,pf:0,pa:0};
-              rm[k1].pf+=s1;rm[k1].pa+=s2;rm[k2].pf+=s2;rm[k2].pa+=s1;
-              if(s1>s2){rm[k1].w++;rm[k1].pts++;rm[k2].l++}else if(s2>s1){rm[k2].w++;rm[k2].pts++;rm[k1].l++}
-            });
-            return Object.values(rm).sort((a,b)=>b.pts-a.pts||(b.pf-b.pa)-(a.pf-a.pa));
-          })();
-          return <div key={sess.id} style={{borderBottom:"1px solid var(--g3)"}}>
-            <div className="fb" style={{padding:"12px 0",cursor:"pointer"}} onClick={()=>setExpandSess(isOpen?null:sess.id)}>
+          return <div key={sess.id} style={{padding:"12px 0",borderBottom:"1px solid var(--g3)"}}>
+            <div className="fb">
               <div>
-                <div style={{fontSize:14,fontWeight:600}}><span style={{display:"inline-block",transition:"transform .2s",transform:isOpen?"rotate(90deg)":"rotate(0)",marginRight:6,fontSize:10}}>▶</span>{sess.date}{isPub&&<span style={{fontSize:10,fontWeight:700,color:"var(--brand)",background:"var(--brand50)",padding:"1px 6px",borderRadius:4,marginLeft:8}}>공용</span>}</div>
-                <div style={{fontSize:12,color:"var(--tx2)",marginTop:3,marginLeft:20}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
+                <div style={{fontSize:14,fontWeight:600}}>{sess.date}</div>
+                <div style={{fontSize:12,color:"var(--tx2)",marginTop:3}}>{names.size}명 · {sess.matchData.length}경기 · {sess.teamSize}인조 {sess.mt==="roundrobin"?"라운드로빈":"토너먼트"}</div>
+                <div style={{fontSize:11,color:"var(--g1)",marginTop:2}}>{[...names].slice(0,6).join(", ")}{names.size>6?" 외 "+(names.size-6)+"명":""}</div>
               </div>
-              {!isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
-                <button className="btn bs" onClick={function(e){e.stopPropagation();
-                  var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
-                  try{var fi=new File([bl],fn,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[fi]})){navigator.share({title:fn,files:[fi]});return}}catch(ex){}
-                  var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
-                }} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
-                <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
-              </div>}
+              <button className="btn bd" onClick={()=>onDelete(sess.id)} style={{fontSize:11,padding:"4px 10px",flexShrink:0}}>삭제</button>
             </div>
-            {isOpen&&<div style={{paddingBottom:14,marginLeft:10,borderLeft:"2px solid var(--g3)",paddingLeft:14}}>
-              {sess.matchData.map((m,mi)=>{
-                const s1=m.s1,s2=m.s2,ok=!isNaN(s1)&&!isNaN(s2);
-                const w1=ok&&s1>s2,w2=ok&&s2>s1;
-                return <div key={mi} className="mr" style={{marginBottom:6}}>
-                  <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.t1.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
-                  <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{ok?s1:"-"} : {ok?s2:"-"}</span></div>
-                  <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.t2.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
-                </div>})}
-              {sessRank.length>0&&<div style={{marginTop:10,padding:"10px 12px",background:"var(--g4)",borderRadius:10}}>
-                <div style={{fontSize:12,fontWeight:700,color:"var(--tx2)",marginBottom:8}}>📊 이날의 순위</div>
-                {sessRank.map((r,i)=><div key={i} className="fb" style={{padding:"4px 0"}}>
-                  <span style={{fontSize:13}}><span style={{fontWeight:800,color:i===0?"var(--gold)":i<3?"var(--brand)":"var(--tx2)",marginRight:6}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontWeight:600}}>{r.name}</span></span>
-                  <span style={{fontSize:12,color:"var(--tx2)"}}>{r.w}승{r.l}패 · {r.pf}-{r.pa}</span>
-                </div>)}
-              </div>}
-            </div>}
           </div>
         })}
       </div>
     </div>}
-    {view==="history"&&<div className="cd" style={{marginTop:10}}>
-      <p className="sl">⚙️ 관리자 설정</p>
-      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:10}}>GitHub PAT를 설정하면 기록 저장 시 레포에 자동 push됩니다</p>
-      {(()=>{
-        const saved=typeof localStorage!=="undefined"&&localStorage.getItem("wc_gh_token");
-        return saved
-          ?<div className="fb"><span style={{fontSize:13,color:"var(--green)",fontWeight:600}}>✅ 토큰 설정됨</span><button className="btn bd" onClick={()=>{localStorage.removeItem("wc_gh_token");window.location.reload()}} style={{fontSize:11,padding:"4px 10px"}}>해제</button></div>
-          :<button className="btn bs" onClick={()=>{const t=window.prompt("GitHub Personal Access Token 입력\n(repo 권한 필요)");if(t&&t.trim()){localStorage.setItem("wc_gh_token",t.trim());window.location.reload()}}} style={{fontSize:12}}>🔑 GitHub 토큰 설정</button>;
-      })()}
-    </div>}
   </div>;
 }
+
+/* 공유 모달 */
 function ShareModal({txt,url,onClose}){
   const[cp,setCp]=useState("");
   const copy=(s,label)=>{navigator.clipboard.writeText(s).then(()=>{setCp(label);setTimeout(()=>setCp(""),2000)}).catch(()=>{})};
@@ -1007,77 +877,6 @@ function ShareModal({txt,url,onClose}){
       {url&&url.length>=2500&&<p style={{fontSize:12,color:"var(--tx2)",textAlign:"center"}}>데이터가 커서 QR 생성 불가 — 링크를 직접 공유해주세요</p>}
     </div>
   </div>;
-}
-
-/* 공유 뷰 (별도 컴포넌트 — Safari 호환) */
-function SharedView({data}){
-  const allM=(data.r||[]).flatMap(function(rd){return rd.m});
-  const sDone=allM.filter(function(m){return m.s1!==""&&m.s2!==""}).length;
-  const sTotal=allM.length;
-  const sPct=sTotal?Math.round(sDone/sTotal*100):0;
-  const hasScore=sDone>0;
-
-  const sRank=useMemo(function(){
-    if(!hasScore)return[];
-    var m={};
-    /* 와일드카드 선수 식별 — 보너스 팀의 첫 번째 선수 */
-    var wcPlayer=null;
-    (data.t||[]).forEach(function(t){if(t.b&&t.p.length>0)wcPlayer=t.p[0].n});
-    /* 팀 키 생성: 와일드카드 포함 팀은 "wc"로 통합 */
-    function tKey(names){if(wcPlayer&&names.indexOf(wcPlayer)>=0)return"wc";return[].concat(names).sort().join("|")}
-    (data.t||[]).forEach(function(t){
-      if(t.b){if(wcPlayer)m["wc"]={name:wcPlayer+" ⭐",w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:true}}
-      else{var k=t.p.map(function(x){return x.n}).sort().join("|");m[k]={name:t.p.map(function(x){return x.n}).join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}}}
-    });
-    allM.forEach(function(x){
-      var a=parseInt(x.s1,10),b=parseInt(x.s2,10);if(isNaN(a)||isNaN(b))return;
-      var k1=tKey(x.a),k2=tKey(x.b);
-      if(!m[k1])m[k1]={name:x.a.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
-      if(!m[k2])m[k2]={name:x.b.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
-      m[k1].pf+=a;m[k1].pa+=b;m[k2].pf+=b;m[k2].pa+=a;
-      if(a>b){m[k1].w++;m[k1].pts++;m[k2].l++;m[k1].h2h[k2]=(m[k1].h2h[k2]||0)+1}
-      else if(b>a){m[k2].w++;m[k2].pts++;m[k1].l++;m[k2].h2h[k1]=(m[k2].h2h[k1]||0)+1}
-      else{m[k1].d++;m[k2].d++}
-    });
-    var arr=Object.entries(m).map(function(e){return Object.assign({},e[1],{key:e[0]})});
-    arr.sort(function(a,b){if(b.pts!==a.pts)return b.pts-a.pts;var aw=a.h2h[b.key]||0,bw=b.h2h[a.key]||0;if(aw!==bw)return bw-aw;return(b.pf-b.pa)-(a.pf-a.pa)});
-    return arr;
-  },[data,hasScore]);
-
-  return <main className="mn" style={{paddingTop:16}}>
-    <div className="cd">
-      <p className="sl">{data.t.length}개 조</p>
-      <div className="tg">{data.t.map(function(t,i){return <div key={i} className={"tc"+(t.b?" bonus":"")}>
-        <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:t.b?"var(--gold)":"var(--brand)"}}>{t.b?"와일드카드":"조 "+(i+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)",background:"var(--card)",border:"1px solid var(--bdr)",padding:"2px 7px",borderRadius:5}}>합 {t.p.reduce(function(s,x){return s+x.s},0)}</span></div>
-        {t.p.map(function(p,j){return <div key={j} className="fb" style={{marginTop:4}}><span style={{fontSize:14,fontWeight:500}}>{p.n}</span><span className="fg"><Badge level={p.s} />{p.g&&<GBadge gender={p.g} />}</span></div>})}
-      </div>})}</div>
-    </div>
-    {sTotal>0&&<div style={{marginBottom:14}}>
-      <div className="fg" style={{marginBottom:5}}>
-        <span style={{fontSize:12,fontWeight:700,color:sPct===100?"var(--green)":"var(--tx2)"}}>{sPct===100?"✅ 전체 완료":sDone+" / "+sTotal+" 경기"}</span>
-        <span style={{fontSize:11,color:"var(--tx2)",marginLeft:"auto"}}>{sPct}%</span>
-      </div>
-      <div className="rb" style={{height:5}}><div className="rf" style={{width:sPct+"%",background:sPct===100?"var(--green)":"var(--brand)",transition:"width .4s ease"}} /></div>
-    </div>}
-    {data.r&&data.r.length>0&&data.r.map(function(rd,ri){return <div key={ri} className="cd">
-      <div className="sl fg"><span>{rd.l||("라운드 "+rd.n)}</span><span style={{fontSize:11,color:"var(--tx2)",fontWeight:600,background:"var(--g4)",padding:"2px 7px",borderRadius:5}}>{rd.m.length}경기</span></div>
-      {rd.m.map(function(m,mi){var a=parseInt(m.s1,10),b=parseInt(m.s2,10),ok=!isNaN(a)&&!isNaN(b);var w1=ok&&a>b,w2=ok&&b>a;
-        return <div key={mi}>{m.c>0&&<span className="court-tag" style={{background:COURT_C[(m.c-1)%4]}}>코트 {m.c}</span>}<div className="mr">
-          <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.a.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
-          <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{m.s1||"-"} : {m.s2||"-"}</span></div>
-          <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.b.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
-        </div></div>})}
-    </div>})}
-    {hasScore?<div className="cd">
-      <p className="sl">📊 순위표</p>
-      <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>승리 +1점 · 동률: 승자승 → 득실차</p>
-      {sRank.map(function(r,i){var tot=r.w+r.l+r.d;var pct=tot?Math.round(r.w/tot*100):0;
-        return <div key={i} className="rr"><span style={{fontSize:15,fontWeight:800,color:i===0?"var(--gold)":i<3?"var(--brand)":"var(--g1)",width:26,textAlign:"center"}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontSize:14,fontWeight:700,minWidth:90,flex:"0 0 auto"}}>{r.name}{r.isBonus&&<span className="dual-tag" style={{marginLeft:4,background:"var(--gold)",color:"#fff"}}>⭐</span>}</span><span style={{fontSize:12,color:"var(--tx2)",minWidth:55}}>{r.w}승 {r.l}패</span><span style={{fontSize:13,fontWeight:800,color:"var(--brand)",minWidth:30}}>{r.pts}점</span><div className="rb"><div className="rf" style={{width:pct+"%"}} /></div><span style={{fontSize:12,color:"var(--tx2)",minWidth:50,textAlign:"right"}}>{r.pf}-{r.pa}</span></div>})}
-    </div>:<div className="cd" style={{textAlign:"center",padding:"20px"}}><p style={{fontSize:13,color:"var(--tx2)"}}>매치 결과 입력 후 표시됩니다.</p></div>}
-    <div className="cd" style={{textAlign:"center",padding:20}}>
-      <button className="btn bp bf" onClick={function(){window.location.hash="";window.location.reload()}} style={{padding:"12px 24px"}}>🏸 와일드콕 열기</button>
-    </div>
-  </main>;
 }
 
 /* ═══════════════════════════════════════ */
@@ -1129,30 +928,7 @@ function App(){
 
   /* 기록실 */
   const[history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem("bp_history"))||[]}catch{return[]}});
-  const[pubHistory,setPubHistory]=useState([]);
   useEffect(()=>{try{localStorage.setItem("bp_history",JSON.stringify(history))}catch{}},[history]);
-
-  /* 공용 기록: GitHub 레포 history/ 폴더에서 자동 로드 */
-  useEffect(()=>{
-    const REPO="zmdals/wildcock";
-    const DIR="history";
-    fetch("https://api.github.com/repos/"+REPO+"/contents/"+DIR)
-      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
-      .then(files=>{
-        const jsons=files.filter(f=>f.name.endsWith(".json"));
-        if(!jsons.length)return;
-        return Promise.all(jsons.map(f=>
-          fetch(DIR+"/"+f.name).then(r=>r.ok?r.json():null).catch(()=>null)
-        ));
-      })
-      .then(results=>{
-        if(!results)return;
-        const all=[];
-        results.forEach(d=>{if(!d)return;(Array.isArray(d)?d:[d]).forEach(s=>{if(s&&s.matchData)all.push({...s,_pub:true})})});
-        setPubHistory(all);
-      })
-      .catch(()=>{/* 네트워크 오류 무시 — localStorage 기록만 사용 */});
-  },[]);
 
   useEffect(()=>{try{localStorage.setItem("bp",JSON.stringify(players))}catch{}},[players]);
   useEffect(()=>{try{localStorage.setItem("bp_session",JSON.stringify({teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,restMode,wcMode,matches,subTab}))}catch{}},[teams,extraPlayer,dualPartner,pm,mixed,teamSize,wildcardId,mt,courtCount,restMode,wcMode,matches,subTab]);
@@ -1189,73 +965,15 @@ function App(){
     const dup=history.find(h=>h.date===session.date&&h.matchData.length===session.matchData.length);
     if(dup&&!window.confirm("오늘 이미 저장된 기록이 있습니다. 추가 저장할까요?"))return;
     setHistory(prev=>[session,...prev]);
-    toast.show("💾 기록 저장 완료!");
-    /* GitHub 자동 push */
-    const ghToken=localStorage.getItem("wc_gh_token");
-    if(ghToken){pushSessionToGH(session,ghToken)}
-  };
-
-  const pushSessionToGH=(session,token)=>{
-    const REPO="zmdals/wildcock";
-    const fname="record_"+session.date+".json";
-    const apiUrl="https://api.github.com/repos/"+REPO+"/contents/history/"+fname;
-    const jsonStr=JSON.stringify([session],null,2);
-    const content=btoa(unescape(encodeURIComponent(jsonStr)));
-    /* 파일 존재 여부 확인 (같은 날짜 → 병합) */
-    fetch(apiUrl,{headers:{Authorization:"token "+token}})
-      .then(r=>r.ok?r.json():null)
-      .then(existing=>{
-        let body;
-        if(existing&&existing.sha){
-          /* 기존 파일이 있으면: 기존 내용 + 새 세션 병합 */
-          try{
-            const oldContent=JSON.parse(decodeURIComponent(escape(atob(existing.content.replace(/\n/g,"")))));
-            const merged=Array.isArray(oldContent)?[...oldContent,session]:[oldContent,session];
-            const unique=[...new Map(merged.map(s=>[s.id,s])).values()];
-            const newContent=btoa(unescape(encodeURIComponent(JSON.stringify(unique,null,2))));
-            body={message:"기록 업데이트: "+session.date,content:newContent,sha:existing.sha};
-          }catch{
-            body={message:"기록 추가: "+session.date,content,sha:existing.sha};
-          }
-        }else{
-          body={message:"기록 추가: "+session.date,content};
-        }
-        return fetch(apiUrl,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
-      })
-      .then(r=>{if(r.ok){toast.show("☁️ GitHub에 자동 저장 완료!")}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
-      .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
+    toast.show("💾 기록 저장 완료! 기록실에서 확인하세요");
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
-  const shareSession=function(sess){
-    var fname="record_"+sess.date+".json";
-    var jsonStr=JSON.stringify([sess],null,2);
-    var blob=new Blob([jsonStr],{type:"application/json"});
-    /* 모바일: Web Share API 시도 */
-    if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
-      try{
-        var file=new File([blob],fname,{type:"application/json"});
-        if(navigator.canShare({files:[file]})){
-          navigator.share({title:"와일드콕 기록 "+sess.date,files:[file]}).catch(function(){});
-          return;
-        }
-      }catch(e){/* 무시 */}
-    }
-    /* 데스크톱/폴백: exportHistory와 동일한 다운로드 */
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement("a");
-    a.href=url;a.download=fname;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.show("📥 "+fname+" 다운로드 완료 — 관리자에게 전달해주세요");
-  };
   const exportHistory=()=>{
-    const fname="records_"+new Date().toISOString().slice(0,10)+".json";
     const blob=new Blob([JSON.stringify(history,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");
-    a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    toast.show("📥 "+fname+" 다운로드 완료");
+    a.href=url;a.download="와일드콕_기록_"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    toast.show("📥 백업 파일 다운로드됨");
   };
   const importHistory=(e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -1429,7 +1147,68 @@ function App(){
         </div>
       </header>
 
-      {sharedView&&_shared?<SharedView data={_shared} />:<main className="mn" style={{paddingTop:16}}>
+      {sharedView&&_shared?(()=>{
+        /* 공유 뷰 진행도·순위 계산 */
+        const allM=(_shared.r||[]).flatMap(rd=>rd.m);
+        const sDone=allM.filter(m=>m.s1!==""&&m.s2!=="").length;
+        const sTotal=allM.length;
+        const sPct=sTotal?Math.round(sDone/sTotal*100):0;
+        const hasScore=sDone>0;
+
+        const sRank=(()=>{
+          if(!hasScore)return[];
+          const m={};
+          /* 팀명 키 생성 */
+          (_shared.t||[]).forEach(t=>{const k=t.p.map(x=>x.n).sort().join("|");m[k]={name:t.p.map(x=>x.n).join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{},isBonus:!!t.b}});
+          allM.forEach(x=>{
+            const a=parseInt(x.s1,10),b=parseInt(x.s2,10);if(isNaN(a)||isNaN(b))return;
+            const k1=[...x.a].sort().join("|"),k2=[...x.b].sort().join("|");
+            if(!m[k1])m[k1]={name:x.a.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
+            if(!m[k2])m[k2]={name:x.b.join(" · "),w:0,l:0,d:0,pts:0,pf:0,pa:0,h2h:{}};
+            m[k1].pf+=a;m[k1].pa+=b;m[k2].pf+=b;m[k2].pa+=a;
+            if(a>b){m[k1].w++;m[k1].pts++;m[k2].l++;m[k1].h2h[k2]=(m[k1].h2h[k2]||0)+1}
+            else if(b>a){m[k2].w++;m[k2].pts++;m[k1].l++;m[k2].h2h[k1]=(m[k2].h2h[k1]||0)+1}
+            else{m[k1].d++;m[k2].d++}
+          });
+          const arr=Object.entries(m).map(([k,v])=>({...v,key:k}));
+          arr.sort((a,b)=>{if(b.pts!==a.pts)return b.pts-a.pts;const aw=a.h2h[b.key]||0,bw=b.h2h[a.key]||0;if(aw!==bw)return bw-aw;return(b.pf-b.pa)-(a.pf-a.pa)});
+          return arr;
+        })();
+
+        return <main className="mn" style={{paddingTop:16}}>
+        <div className="cd">
+          <p className="sl">{_shared.t.length}개 조</p>
+          <div className="tg">{_shared.t.map((t,i)=><div key={i} className={"tc"+(t.b?" bonus":"")}>
+            <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:t.b?"var(--gold)":"var(--brand)"}}>{t.b?"와일드카드":"조 "+(i+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)",background:"var(--card)",border:"1px solid var(--bdr)",padding:"2px 7px",borderRadius:5}}>합 {t.p.reduce((s,x)=>s+x.s,0)}</span></div>
+            {t.p.map((p,j)=><div key={j} className="fb" style={{marginTop:4}}><span style={{fontSize:14,fontWeight:500}}>{p.n}</span><span className="fg"><Badge level={p.s} />{p.g&&<GBadge gender={p.g} />}</span></div>)}
+          </div>)}</div>
+        </div>
+        {sTotal>0&&<div style={{marginBottom:14}}>
+          <div className="fg" style={{marginBottom:5}}>
+            <span style={{fontSize:12,fontWeight:700,color:sPct===100?"var(--green)":"var(--tx2)"}}>{sPct===100?"✅ 전체 완료":sDone+" / "+sTotal+" 경기"}</span>
+            <span style={{fontSize:11,color:"var(--tx2)",marginLeft:"auto"}}>{sPct}%</span>
+          </div>
+          <div className="rb" style={{height:5}}><div className="rf" style={{width:sPct+"%",background:sPct===100?"var(--green)":"var(--brand)",transition:"width .4s ease"}} /></div>
+        </div>}
+        {_shared.r&&_shared.r.length>0&&_shared.r.map((rd,ri)=><div key={ri} className="cd">
+          <div className="sl fg"><span>{rd.l||("라운드 "+rd.n)}</span><span style={{fontSize:11,color:"var(--tx2)",fontWeight:600,background:"var(--g4)",padding:"2px 7px",borderRadius:5}}>{rd.m.length}경기</span></div>
+          {rd.m.map((m,mi)=>{const a=parseInt(m.s1,10),b=parseInt(m.s2,10),ok=!isNaN(a)&&!isNaN(b);const w1=ok&&a>b,w2=ok&&b>a;
+            return <div key={mi}>{m.c>0&&<span className="court-tag" style={{background:COURT_C[(m.c-1)%4]}}>코트 {m.c}</span>}<div className="mr">
+              <div className={"msd"+(w2?" ls":"")}><div className="msd-n">{m.a.join(" · ")}</div>{w1&&<span className="wt">WIN</span>}</div>
+              <div style={{display:"flex",alignItems:"center",padding:"0 6px",flexShrink:0}}><span className="sc">{m.s1||"-"} : {m.s2||"-"}</span></div>
+              <div className={"msd"+(w1?" ls":"")}><div className="msd-n">{m.b.join(" · ")}</div>{w2&&<span className="wt">WIN</span>}</div>
+            </div></div>})}
+        </div>)}
+        {hasScore?<div className="cd">
+          <p className="sl">📊 순위표</p>
+          <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>승리 +1점 · 동률: 승자승 → 득실차</p>
+          {sRank.map((r,i)=>{const tot=r.w+r.l+r.d;const pct=tot?Math.round(r.w/tot*100):0;
+            return <div key={i} className="rr"><span style={{fontSize:15,fontWeight:800,color:i===0?"var(--gold)":i<3?"var(--brand)":"var(--g1)",width:26,textAlign:"center"}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1)}</span><span style={{fontSize:14,fontWeight:700,minWidth:90,flex:"0 0 auto"}}>{r.name}{r.isBonus&&<span className="dual-tag" style={{marginLeft:4,background:"var(--gold)",color:"#fff"}}>⭐</span>}</span><span style={{fontSize:12,color:"var(--tx2)",minWidth:55}}>{r.w}승 {r.l}패</span><span style={{fontSize:13,fontWeight:800,color:"var(--brand)",minWidth:30}}>{r.pts}점</span><div className="rb"><div className="rf" style={{width:pct+"%"}} /></div><span style={{fontSize:12,color:"var(--tx2)",minWidth:50,textAlign:"right"}}>{r.pf}-{r.pa}</span></div>})}
+        </div>:<div className="cd" style={{textAlign:"center",padding:"20px"}}><p style={{fontSize:13,color:"var(--tx2)"}}>매치 결과 입력 후 표시됩니다.</p></div>}
+        <div className="cd" style={{textAlign:"center",padding:20}}>
+          <button className="btn bp bf" onClick={()=>{window.location.hash="";window.location.reload()}} style={{padding:"12px 24px"}}>🏸 와일드콕 열기</button>
+        </div>
+      </main>})():<main className="mn" style={{paddingTop:16}}>
 
       {mainTab==="badminton"&&<div>
         <StatBento playerCount={players.length} teamCount={realTeamCount} matchCount={totalMatchCount} />
@@ -1552,23 +1331,12 @@ function App(){
               <div style={{fontSize:15,fontWeight:800,color:"var(--brand)",marginBottom:8}}>🎉 모든 매치 완료!</div>
               <p style={{fontSize:12,color:"var(--tx2)",marginBottom:14}}>기록실에 저장하면 누적 통계에 반영됩니다.</p>
               <button className="btn bgn bf" onClick={saveSession} style={{fontSize:15,padding:"12px 24px"}}>💾 기록실에 저장</button>
-              <button className="btn bs" onClick={function(){
-                var sess={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize:teamSize,mt:mt,
-                  players:players.map(function(p){return{name:p.name,skill:p.skill,gender:p.gender}}),
-                  matchData:matches.map(function(rd){return rd.matches.map(function(m){return{
-                    t1:(m.team1.players||[]).map(function(p){return p.name}),t2:(m.team2.players||[]).map(function(p){return p.name}),
-                    s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)}})}).flat()};
-                var fn="record_"+sess.date+".json";var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
-                try{var fi=new File([bl],fn,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[fi]})){navigator.share({title:fn,files:[fi]});return}}catch(ex){}
-                var u=URL.createObjectURL(bl);var a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
-              }} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
-              <p style={{fontSize:11,color:"var(--tx2)",marginTop:8}}>관리자 부재 시: 저장 후 전송 버튼으로 카톡 전달</p>
             </div>}
           </>}
         </div>}
       </div>}
 
-      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onExport={exportHistory} onImport={importHistory} onShare={shareSession} />}
+      {mainTab==="records"&&<RecordsTab history={history} onDelete={delSession} onExport={exportHistory} onImport={importHistory} />}
 
       {mainTab==="roulette"&&<div>
         <div className="cd">
