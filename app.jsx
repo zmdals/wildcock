@@ -1089,7 +1089,7 @@ function App(){
     if(!document.getElementById("wc-favicon")){
       const old=document.querySelector('link[rel="icon"],link[rel="shortcut icon"]');
       if(old)old.remove();
-      const lnk=document.createElement("link");lnk.id="wc-favicon";lnk.rel="icon";lnk.href="uploads/favicon_32.png";
+      const lnk=document.createElement("link");lnk.id="wc-favicon";lnk.rel="icon";lnk.href="/wildcock/uploads/favicon_32.png";
       document.head.appendChild(lnk);
     }
   },[]);
@@ -1226,8 +1226,9 @@ function App(){
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
   var shareOrDownload=function(blob,fname,title,toastMsg){
-    /* 모바일/태블릿: Web Share API */
-    if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
+    /* 모바일/태블릿 판별: userAgent 기반 (데스크톱 Chrome도 Web Share API를 지원하므로 API 존재 여부만으로는 부족) */
+    var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
+    if(isMobile&&typeof File!=="undefined"&&navigator.share&&navigator.canShare){
       try{
         var file=new File([blob],fname,{type:blob.type||"application/json"});
         if(navigator.canShare({files:[file]})){
@@ -1243,7 +1244,7 @@ function App(){
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(function(){URL.revokeObjectURL(url)},1000);
     toast.show(toastMsg||"📥 "+fname+" 다운로드 완료");
   };
   const shareSession=function(sess){
