@@ -129,7 +129,7 @@ input,button,select,textarea{font-family:inherit}
 .rr{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px}.rr:nth-child(even){background:var(--g4)}
 .rb{height:6px;border-radius:4px;background:var(--g3);flex:1;overflow:hidden}.rf{height:100%;border-radius:4px;background:var(--brand);transition:width .35s}
 .dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-top:12px}
-.dp-btn{padding:10px;border-radius:11px;border:1.5px solid var(--bdr);background:var(--g4);cursor:pointer;text-align:center;transition:all .16s;font-family:inherit}.dp-btn:hover{border-color:var(--brand);background:var(--brand50)}
+.dp-btn{padding:10px;border-radius:11px;border:1.5px solid var(--bdr);background:var(--g4);cursor:pointer;text-align:center;transition:all .16s;font-family:inherit}.dp-btn:hover{border-color:var(--brand);background:var(--brand50)}.dp-btn.sel{border-color:var(--brand);background:var(--brand50);box-shadow:0 0 0 2px var(--brand50)}
 .dutch-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:11px;background:var(--g4);margin-bottom:6px}
 .dutch-row .name{flex:1;font-size:14px;font-weight:500}.dutch-row .amount{font-size:16px;font-weight:800;color:var(--brand)}
 .check-btn{width:24px;height:24px;border-radius:7px;border:2px solid var(--bdr);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .16s}.check-btn.on{border-color:var(--brand);background:var(--brand);color:#fff}
@@ -173,131 +173,8 @@ input,button,select,textarea{font-family:inherit}
 .app-footer .sep{margin:0 6px;opacity:.5}
 `;
 
-/* base64 유틸 */
-function toBase64(str){return btoa(String.fromCharCode(...new TextEncoder().encode(str)))}
-function fromBase64(b64){return new TextDecoder().decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)))}
-
-const SK_L=["","입문","초급","중급","상급","고수"];
-/* 레벨별 채도 높은 단색 — 초급→고수로 색 톤 변화 (쿨→웜→엘리트) */
-const SK_C=["","#0891B2","#16A34A","#E0900A","#DC2626","#7C3AED"];
-const GEN_C={M:"#2563EB",F:"#DB2777"};const GEN_L={M:"남",F:"여"};
-const COURT_C=["#0B9E5D","#2563EB","#E0900A","#7C3AED"];
-
-function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]]}return b}
-function balanced2(ps){const s=shuffle([...ps]).sort((a,b)=>b.skill-a.skill);const t=[];let lo=0,hi=s.length-1;while(lo<hi){t.push({players:[s[lo],s[hi]]});lo++;hi--}return t}
-function random2(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-1;i+=2)t.push({players:[s[i],s[i+1]]});return t}
-function balanced3(ps){const s=shuffle([...ps]).sort((a,b)=>b.skill-a.skill);const n=Math.floor(s.length/3);const t=Array.from({length:n},()=>({players:[]}));let d=1,idx=0;for(const p of s){if(idx>=0&&idx<n)t[idx].players.push(p);idx+=d;if(idx>=n||idx<0){d*=-1;idx+=d}}return t.filter(x=>x.players.length>=2)}
-function random3(ps){const s=shuffle(ps);const t=[];for(let i=0;i<s.length-2;i+=3)t.push({players:[s[i],s[i+1],s[i+2]]});return t}
-function mixedPair(ps,mode){const ms=ps.filter(p=>p.gender==="M"),fs=ps.filter(p=>p.gender==="F"),us=ps.filter(p=>!p.gender);const t=[];let mL=mode==="balanced"?shuffle([...ms]).sort((a,b)=>b.skill-a.skill):shuffle(ms);let fL=mode==="balanced"?shuffle([...fs]).sort((a,b)=>a.skill-b.skill):shuffle(fs);const n=Math.min(mL.length,fL.length);for(let i=0;i<n;i++)t.push({players:[mL[i],fL[i]]});const rem=[...mL.slice(n),...fL.slice(n),...us];if(rem.length>=2)t.push(...(mode==="balanced"?balanced2(rem):random2(rem)));return t}
-function sharePlayer(t1,t2){if(t1.bye||t2.bye||t1.ph||t2.ph)return false;const s=new Set((t1.players||[]).map(p=>p.id));return(t2.players||[]).some(p=>s.has(p.id))}
-function tn(t){if(t.bye)return"부전승";if(t.ph)return t.name;return(t.players||[]).map(p=>p.name).join(" · ")}
-function tsk(t){return(t.bye||t.ph)?null:(t.players||[]).reduce((s,p)=>s+p.skill,0)}
-function tid(t){return t.bye?"bye":t.ph?t.name:(t.players||[]).map(p=>p.id).sort((a,b)=>a-b).join("-")}
-function genRR(teams){const r=[];const l=[...teams];if(l.length%2)l.push({bye:true});const n=l.length;for(let i=0;i<n-1;i++){const m=[];for(let j=0;j<n/2;j++){const a=l[j],b=l[n-1-j];if(!a.bye&&!b.bye&&!sharePlayer(a,b))m.push({team1:a,team2:b,s1:"",s2:""})}if(m.length)r.push({round:i+1,matches:m});const last=l.pop();l.splice(1,0,last)}return r}
-function genRRWildcard(teams,extra,mixed){
-  const WC={players:[extra,{id:-999,name:"?",skill:0,gender:null}],isBonus:true,isWildcard:true};
-  const all=[...teams,WC];const raw=genRR(all);
-  const avgSum=teams.reduce((s,t)=>s+(t.players||[]).reduce((a,p)=>a+p.skill,0),0)/teams.length;
-  const usedIds=[];
-  return raw.map(rd=>{
-    const wci=rd.matches.findIndex(m=>(m.team1.isWildcard||m.team2.isWildcard));
-    if(wci<0)return rd;
-    const wm=rd.matches[wci];
-    const opp=wm.team1.isWildcard?wm.team2:wm.team1;
-    const oppIds=new Set((opp.players||[]).map(p=>p.id));
-    const others=rd.matches.filter((_,i)=>i!==wci);
-    const cands=[];
-    for(const om of others)for(const t of[om.team1,om.team2]){if(t.isBonus||t.bye||t.ph)continue;
-      for(const p of(t.players||[])){if(oppIds.has(p.id)||p.id===extra.id)continue;
-        const used=usedIds.filter(id=>id===p.id).length;
-        const sd=Math.abs(extra.skill+p.skill-avgSum);
-        let gOk=true;if(mixed&&extra.gender&&p.gender&&extra.gender===p.gender)gOk=false;
-        cands.push({p,team:t,match:om,used,sd,gOk});
-      }
-    }
-    /* bye 라운드 등으로 쉬는 팀의 선수도 파트너 후보에 포함 */
-    const playingIds=new Set();
-    rd.matches.forEach(m=>{(m.team1.players||[]).forEach(p=>playingIds.add(p.id));(m.team2.players||[]).forEach(p=>playingIds.add(p.id))});
-    for(const t of teams){if(t.isBonus||t.bye||t.ph)continue;
-      if((t.players||[]).some(p=>playingIds.has(p.id)))continue;
-      for(const p of(t.players||[])){if(oppIds.has(p.id)||p.id===extra.id)continue;
-        const used=usedIds.filter(id=>id===p.id).length;
-        const sd=Math.abs(extra.skill+p.skill-avgSum);
-        let gOk=true;if(mixed&&extra.gender&&p.gender&&extra.gender===p.gender)gOk=false;
-        cands.push({p,team:t,match:null,used,sd,gOk});
-      }
-    }
-    cands.sort((a,b)=>{if(a.gOk!==b.gOk)return(b.gOk?1:0)-(a.gOk?1:0);if(a.used!==b.used)return a.used-b.used;return a.sd-b.sd});
-    if(!cands.length)return rd;
-    const chosen=cands[0];usedIds.push(chosen.p.id);
-    const wcTeam={players:[extra,chosen.p],isBonus:true};
-    const newWm=wm.team1.isWildcard?{...wm,team1:wcTeam}:{...wm,team2:wcTeam};
-    const newMatches=rd.matches.map((m,i)=>i===wci?newWm:m);
-    return{...rd,matches:newMatches};
-  });
-}
-function genT(teams){let sz=1;while(sz<teams.length)sz*=2;const br=[...teams];while(br.length<sz)br.push({bye:true});const s=shuffle(br);const r=[];let c=s;let rn=1;while(c.length>1){const m=[];for(let i=0;i<c.length;i+=2)m.push({team1:c[i],team2:c[i+1],s1:"",s2:""});const lb=c.length===2?"결승":c.length===4?"준결승":c.length===8?"8강":c.length+"팀";r.push({round:rn,matches:m,label:lb});c=m.map((_,i)=>({ph:true,name:"R"+rn+"W"+(i+1)}));rn++}return r}
-function assignCourts(matches,cc){if(cc<=1)return matches;return matches.map(r=>({...r,matches:r.matches.map((m,i)=>({...m,court:(i%cc)+1}))}))}
-function scheduleSlots(rounds,cc,optimize){
-  if(cc<=1)return rounds;
-  const all=rounds.flatMap(r=>r.matches);if(!all.length)return rounds;
-  const gp=m=>{const s=new Set();(m.team1.players||[]).forEach(p=>s.add(p.id));(m.team2.players||[]).forEach(p=>s.add(p.id));return s};
-  const olap=(a,b)=>{for(const id of a)if(b.has(id))return true;return false};
-
-  const build=(matches)=>{
-    const rem=[...matches],slots=[];
-    const lp={},cn={},ch={};
-    const est=Math.ceil(all.length/cc);
-    while(rem.length){
-      const si=slots.length,slot=[],sp=new Set(),st=new Set();
-      const ramp=est>1?1.6-1.2*Math.min(1,si/(est-1)):1;
-      const thresh=150*ramp;
-      for(let court=1;court<=cc;court++){
-        let bi=-1,bp=1e9;
-        for(let i=0;i<rem.length;i++){
-          const m=rem[i],mp=gp(m),t1=tid(m.team1),t2=tid(m.team2);
-          if(olap(mp,sp)||st.has(t1)||st.has(t2))continue;
-          let pen=0;
-          for(const pid of mp){
-            if(lp[pid]===si-1){pen+=50;const c=cn[pid]||0;if(c>=2)pen+=1000;else if(c>=1)pen+=100}
-            if(lp[pid]!==undefined&&si-lp[pid]>=4)pen+=40;
-            if(ch[pid]&&ch[pid][court])pen+=5*ch[pid][court];
-          }
-          if(pen<bp){bp=pen;bi=i}
-        }
-        if(bi<0)continue;
-        if(optimize&&bp>=thresh&&slot.length>0)continue;
-        const m=rem.splice(bi,1)[0];const mp=gp(m);
-        mp.forEach(id=>sp.add(id));st.add(tid(m.team1));st.add(tid(m.team2));
-        slot.push({...m,court});
-      }
-      if(!slot.length&&rem.length)slot.push({...rem.shift(),court:1});
-      for(const m of slot){for(const pid of gp(m)){cn[pid]=lp[pid]===si-1?(cn[pid]||0)+1:1;lp[pid]=si;if(!ch[pid])ch[pid]={};ch[pid][m.court]=(ch[pid][m.court]||0)+1}}
-      slots.push({round:si+1,matches:slot,label:"\uC2AC\uB86F "+(si+1)});
-    }
-    return slots;
-  };
-
-  const score=(slots)=>{
-    const lp={},cn={},ch={};let pen=0;
-    for(let si=0;si<slots.length;si++)for(const m of slots[si].matches){for(const pid of gp(m)){
-      if(lp[pid]===si-1){pen+=50;const c=cn[pid]||0;if(c>=2)pen+=1000;else if(c>=1)pen+=100}
-      if(lp[pid]!==undefined&&si-lp[pid]>=4)pen+=40;
-      if(ch[pid]&&ch[pid][m.court])pen+=5;
-      cn[pid]=lp[pid]===si-1?(cn[pid]||0)+1:1;lp[pid]=si;
-      if(!ch[pid])ch[pid]={};ch[pid][m.court]=(ch[pid][m.court]||0)+1;
-    }}
-    return pen;
-  };
-
-  let best=null,bestS=1e9;
-  for(let i=0;i<30;i++){
-    const input=i===0?[...all]:shuffle([...all]);
-    const result=build(input);const s=score(result);
-    if(s<bestS){bestS=s;best=result}
-  }
-  return best;
-}
+/* ─────────── 코어 로직 — wildcock-core.js에서 로드 (index.html <script> 선행 필요) ─────────── */
+const{toBase64,fromBase64,SK_L,SK_C,GEN_C,GEN_L,COURT_C,shuffle,balanced2,random2,balanced3,random3,mixedPair,sharePlayer,tn,tsk,tid,genRR,genRRWildcard,genT,assignCourts,scheduleSlots}=window.WC_CORE;
 
 /* 인쇄 */
 function printSheet(allTeams,matches,mt,dualInfo,records,toast){
@@ -1101,6 +978,8 @@ function App(){
   const[pm,setPm]=useState(()=>_ss.pm||"random");const[mixed,setMixed]=useState(()=>_ss.mixed||false);const[teamSize,setTeamSize]=useState(()=>_ss.teamSize||2);const[wildcardId,setWildcardId]=useState(()=>_ss.wildcardId!=null?_ss.wildcardId:null);
   const[mt,setMt]=useState(()=>_ss.mt||"roundrobin");const[courtCount,setCourtCount]=useState(()=>_ss.courtCount||1);const[restMode,setRestMode]=useState(()=>_ss.restMode||false);const[wcMode,setWcMode]=useState(()=>_ss.wcMode||"rotating");
   const[matches,setMatches]=useState(()=>_ss.matches||[]);
+  /* 수동 편성 드래프트 (확정 전 임시 상태) — {slots:[{cap,type:"team"|"wc"|"small",players:[]}]} */
+  const[manualDraft,setManualDraft]=useState(null);const[selPid,setSelPid]=useState(null);
   const[eid,setEid]=useState(null);const[en,setEn]=useState("");const[esk,setEsk]=useState(3);const[eg,setEg]=useState(null);
   const[rNames,setRN]=useState("");const[rCnt,setRC]=useState(1);const[rSrc,setRS]=useState("custom");
   const[confetti,setConfetti]=useState(false);
@@ -1123,29 +1002,41 @@ function App(){
   const[pubHistory,setPubHistory]=useState([]);
   useEffect(()=>{try{localStorage.setItem("bp_history",JSON.stringify(history))}catch{}},[history]);
 
-  /* 공용 기록: GitHub 레포 history/ 폴더에서 자동 로드 */
+  /* 공용 기록: history/index.json 매니페스트 우선 로드 (GitHub Pages 정적 파일 → rate limit 없음)
+     매니페스트가 없거나 실패하면 기존 GitHub contents API로 폴백 (비인증 60회/시 제한) */
   useEffect(function(){
-    try{
-      var REPO="zmdals/wildcock";
-      var DIR="history";
-      fetch("https://api.github.com/repos/"+REPO+"/contents/"+DIR)
-        .then(function(r){if(!r.ok)return null;return r.json()})
-        .then(function(files){
-          if(!files||!Array.isArray(files))return null;
-          var jsons=files.filter(function(f){return f.name.endsWith(".json")});
-          if(!jsons.length)return null;
-          return Promise.all(jsons.map(function(f){
-            return fetch(DIR+"/"+f.name).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
-          }));
-        })
-        .then(function(results){
-          if(!results||!Array.isArray(results))return;
-          var all=[];
-          results.forEach(function(d){if(!d)return;var arr=Array.isArray(d)?d:[d];arr.forEach(function(s){if(s&&s.matchData)all.push(s)})});
-          if(all.length)setPubHistory(all);
-        })
-        .catch(function(){});
-    }catch(e){}
+    var REPO="zmdals/wildcock";
+    var DIR="history";
+    function loadFiles(names){
+      return Promise.all(names.map(function(name){
+        return fetch(DIR+"/"+name).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
+      }));
+    }
+    function apply(results){
+      if(!results||!Array.isArray(results))return;
+      var all=[];
+      results.forEach(function(d){if(!d)return;var arr=Array.isArray(d)?d:[d];arr.forEach(function(s){if(s&&s.matchData)all.push(s)})});
+      if(all.length)setPubHistory(all);
+    }
+    fetch(DIR+"/index.json",{cache:"no-cache"})
+      .then(function(r){if(!r.ok)throw new Error("no manifest");return r.json()})
+      .then(function(idx){
+        var names=(idx&&idx.files)||[];
+        if(!names.length)throw new Error("empty manifest");
+        return loadFiles(names).then(apply);
+      })
+      .catch(function(){
+        fetch("https://api.github.com/repos/"+REPO+"/contents/"+DIR)
+          .then(function(r){if(!r.ok)return null;return r.json()})
+          .then(function(files){
+            if(!files||!Array.isArray(files))return null;
+            var names=files.map(function(f){return f.name}).filter(function(n){return n.endsWith(".json")&&n!=="index.json"});
+            if(!names.length)return null;
+            return loadFiles(names);
+          })
+          .then(apply)
+          .catch(function(){});
+      });
   },[]);
 
   useEffect(()=>{try{localStorage.setItem("bp",JSON.stringify(players))}catch{}},[players]);
@@ -1171,15 +1062,18 @@ function App(){
     return arr;
   },[teams,extraPlayer,matches]);
 
+  /* 세션 스냅샷 생성 — saveSession과 관리자 전송 버튼이 공용 */
+  const buildSession=()=>({id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize,mt,
+    players:players.map(p=>({name:p.name,skill:p.skill,gender:p.gender})),
+    matchData:matches.map(rd=>rd.matches.map(m=>({
+      t1:(m.team1.players||[]).map(p=>p.name),t2:(m.team2.players||[]).map(p=>p.name),
+      s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)
+    }))).flat()
+  });
+
   const saveSession=()=>{
     if(!matchProgress||matchProgress.pct<100){toast.show("⚠️ 모든 매치 결과를 입력해주세요");return}
-    const session={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize,mt,
-      players:players.map(p=>({name:p.name,skill:p.skill,gender:p.gender})),
-      matchData:matches.map(rd=>rd.matches.map(m=>({
-        t1:(m.team1.players||[]).map(p=>p.name),t2:(m.team2.players||[]).map(p=>p.name),
-        s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)
-      }))).flat()
-    };
+    const session=buildSession();
     const dup=history.find(h=>h.date===session.date&&h.matchData.length===session.matchData.length);
     if(dup&&!window.confirm("오늘 이미 저장된 기록이 있습니다. 추가 저장할까요?"))return;
     setHistory(prev=>[session,...prev]);
@@ -1216,8 +1110,41 @@ function App(){
         }
         return fetch(apiUrl,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
       })
-      .then(r=>{if(r.ok){toast.show("☁️ GitHub에 자동 저장 완료!")}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
+      .then(r=>{if(r.ok){toast.show("☁️ GitHub에 자동 저장 완료!");updateGHIndex(fname,token)}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
       .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
+  };
+
+  /* history/index.json 매니페스트 갱신 — 공용 기록 로딩이 API 대신 이 파일을 읽음
+     index.json이 아직 없으면 목록 조회 후 최초 생성 (토큰 인증이라 rate limit 여유) */
+  const updateGHIndex=(fname,token)=>{
+    const REPO="zmdals/wildcock";
+    const idxUrl="https://api.github.com/repos/"+REPO+"/contents/history/index.json";
+    const putIndex=(files,sha)=>{
+      const content=btoa(unescape(encodeURIComponent(JSON.stringify({files},null,2))));
+      const body={message:"기록 인덱스 갱신: "+fname,content};
+      if(sha)body.sha=sha;
+      return fetch(idxUrl,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+    };
+    fetch(idxUrl,{headers:{Authorization:"token "+token}})
+      .then(r=>r.ok?r.json():null)
+      .then(existing=>{
+        if(existing&&existing.sha){
+          let files=[];
+          try{const cur=JSON.parse(decodeURIComponent(escape(atob(existing.content.replace(/\n/g,"")))));files=Array.isArray(cur.files)?cur.files:[]}catch{}
+          if(files.indexOf(fname)>=0)return null;
+          files.push(fname);files.sort();
+          return putIndex(files,existing.sha);
+        }
+        return fetch("https://api.github.com/repos/"+REPO+"/contents/history",{headers:{Authorization:"token "+token}})
+          .then(r=>r.ok?r.json():null)
+          .then(list=>{
+            const files=(Array.isArray(list)?list.map(f=>f.name):[]).filter(n=>n.endsWith(".json")&&n!=="index.json");
+            if(files.indexOf(fname)<0)files.push(fname);
+            files.sort();
+            return putIndex(files,null);
+          });
+      })
+      .catch(()=>{});
   };
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
   var shareOrDownload=function(blob,fname,title,toastMsg){
@@ -1317,8 +1244,8 @@ function App(){
     }catch{return null}
   },[allTeams,matches,mt]);
 
-  const warnReset=()=>{if(teams.length>0){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);toast.show("초기화됨")}return true};
-  const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);toast.show("전체 초기화 완료")};
+  const warnReset=()=>{if(teams.length>0||manualDraft){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setManualDraft(null);setSelPid(null);toast.show("초기화됨")}return true};
+  const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);setManualDraft(null);setSelPid(null);toast.show("전체 초기화 완료")};
   const addP=()=>{const name=nn.trim();if(!name)return;if(players.some(p=>p.name===name)){toast.show("⚠️ 이미 등록됨");return}if(!warnReset())return;setPlayers(p=>[...p,{id:nid,name,skill:ns,gender:ng}]);setNn("");setNs(3);setNg(null);toast.show("✅ "+name)};
   const delP=id=>{if(!warnReset())return;setPlayers(p=>p.filter(x=>x.id!==id))};
   const startE=p=>{setEid(p.id);setEn(p.name);setEsk(p.skill);setEg(p.gender)};
@@ -1326,6 +1253,15 @@ function App(){
 
   const doTeams=()=>{
     const minP=teamSize===3?6:4;if(players.length<minP)return;
+    /* 수동 모드: 빈 조 슬롯만 만들고 사용자가 직접 배치 (홀수 규칙은 자동 편성과 동일) */
+    if(pm==="manual"){
+      const n=players.length,remM=n%teamSize,slots=[];
+      for(let i=0;i<Math.floor(n/teamSize);i++)slots.push({cap:teamSize,type:"team",players:[]});
+      if(remM===1)slots.push({cap:1,type:"wc",players:[]});
+      if(remM===2&&teamSize===3)slots.push({cap:2,type:"small",players:[]});
+      setManualDraft({slots});setSelPid(null);
+      setTeams([]);setExtraPlayer(null);setDualPartner(null);setMatches([]);setSubTab("teams");return;
+    }
     let act=[...players],extra=null;const rem=act.length%teamSize;
     if(rem>0){
       if(rem===1){
@@ -1353,6 +1289,29 @@ function App(){
   };
 
   const canGenMatch=extraPlayer?(wcMode==="fixed"?!!dualPartner&&allTeams.length>=2:teams.length>=2&&mt==="roundrobin"):teams.length>=2;
+
+  /* ── 수동 편성 헬퍼 ── */
+  const draftPool=manualDraft?players.filter(p=>!manualDraft.slots.some(s=>s.players.some(q=>q.id===p.id))):[];
+  const draftAssign=(si)=>{
+    if(selPid==null||!manualDraft)return;
+    const pl=players.find(p=>p.id===selPid);if(!pl)return;
+    const slot=manualDraft.slots[si];
+    if(slot.players.length>=slot.cap){toast.show("이 조는 가득 찼어요");return}
+    setManualDraft({slots:manualDraft.slots.map((s,i)=>i===si?{...s,players:[...s.players,pl]}:s)});
+    setSelPid(null);
+  };
+  const draftRemove=(si,pid)=>{if(!manualDraft)return;setManualDraft({slots:manualDraft.slots.map((s,i)=>i===si?{...s,players:s.players.filter(p=>p.id!==pid)}:s)})};
+  const draftDone=()=>{
+    if(!manualDraft||draftPool.length)return;
+    const real=manualDraft.slots.filter(s=>s.type==="team").map(s=>({players:s.players}));
+    const small=manualDraft.slots.find(s=>s.type==="small");
+    if(small)real.push({players:small.players,isSmall:true});
+    const wc=manualDraft.slots.find(s=>s.type==="wc");
+    setTeams(real);setExtraPlayer(wc?wc.players[0]:null);setDualPartner(null);setMatches([]);
+    setManualDraft(null);setSelPid(null);
+    toast.show("✋ 수동 편성 완료");
+  };
+
   const doMatches=()=>{if(!canGenMatch)return;let raw;if(extraPlayer&&wcMode==="rotating"&&mt==="roundrobin"){raw=genRRWildcard(teams,extraPlayer,mixed)}else{raw=mt==="roundrobin"?genRR(allTeams):genT(allTeams)}setMatches(courtCount>1&&mt==="roundrobin"?scheduleSlots(raw,courtCount,restMode):assignCourts(raw,courtCount));setSubTab("matches")};
   const setScore=(ri,mi,side,v)=>{const num=v.replace(/[^0-9]/g,"");setMatches(prev=>prev.map((rd,rIdx)=>rIdx!==ri?rd:{...rd,matches:rd.matches.map((m,mIdx)=>mIdx!==mi?m:{...m,[side===1?"s1":"s2"]:num})}))};
 
@@ -1467,14 +1426,32 @@ function App(){
           <div className="cd">
             <p className="sl">조 편성</p>
             <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:7}}>팀 인원</label><div className="fg"><button className={"pill "+(teamSize===2?"p-on":"p-off")} onClick={()=>setTeamSize(2)}>2인</button><button className={"pill "+(teamSize===3?"p-on":"p-off")} onClick={()=>setTeamSize(3)}>3인</button></div></div>
-            <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:7}}>방식</label><div className="fg fw"><button className={"pill "+(pm==="random"?"p-on":"p-off")} onClick={()=>setPm("random")}>🎲 무작위</button><button className={"pill "+(pm==="balanced"?"p-on":"p-off")} onClick={()=>setPm("balanced")}>⚖️ 밸런스</button>{teamSize===2&&<button className={"pill "+(mixed?"p-on":"p-off")} onClick={()=>setMixed(!mixed)} style={mixed?{background:"var(--pink)",borderColor:"var(--pink)"}:{}}>👫 혼성</button>}</div></div>
-            {players.length>=minPlayers&&players.length%teamSize===1&&<div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:7}}>와일드카드 지정</label><select className="inp" value={wildcardId==null?"auto":wildcardId} onChange={e=>setWildcardId(e.target.value==="auto"?null:+e.target.value)} style={{padding:"9px 12px"}}><option value="auto">자동 (랜덤{mixed?" · 다수 성별 우선":""})</option>{players.map(p=><option key={p.id} value={p.id}>{p.name} (Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""})</option>)}</select></div>}
+            <div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:7}}>방식</label><div className="fg fw"><button className={"pill "+(pm==="random"?"p-on":"p-off")} onClick={()=>setPm("random")}>🎲 무작위</button><button className={"pill "+(pm==="balanced"?"p-on":"p-off")} onClick={()=>setPm("balanced")}>⚖️ 밸런스</button><button className={"pill "+(pm==="manual"?"p-on":"p-off")} onClick={()=>setPm("manual")}>✋ 수동</button>{teamSize===2&&pm!=="manual"&&<button className={"pill "+(mixed?"p-on":"p-off")} onClick={()=>setMixed(!mixed)} style={mixed?{background:"var(--pink)",borderColor:"var(--pink)"}:{}}>👫 혼성</button>}</div></div>
+            {players.length>=minPlayers&&players.length%teamSize===1&&pm!=="manual"&&<div style={{marginBottom:14}}><label style={{fontSize:12,color:"var(--tx2)",fontWeight:600,display:"block",marginBottom:7}}>와일드카드 지정</label><select className="inp" value={wildcardId==null?"auto":wildcardId} onChange={e=>setWildcardId(e.target.value==="auto"?null:+e.target.value)} style={{padding:"9px 12px"}}><option value="auto">자동 (랜덤{mixed?" · 다수 성별 우선":""})</option>{players.map(p=><option key={p.id} value={p.id}>{p.name} (Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""})</option>)}</select></div>}
             <button className="btn bp bf" onClick={doTeams} disabled={players.length<minPlayers}>{players.length<minPlayers?`최소 ${minPlayers}명 (${players.length}명)`:"조 편성하기"}</button>
           </div>
         </div>}
 
         {subTab==="teams"&&<div>
-          {!teams.length?<div className="cd es"><div className="es-i">🏸</div><div className="es-t">편성된 조 없음</div></div>:<>
+          {manualDraft?<>
+            <div className="cd">
+              <div className="fb" style={{marginBottom:6}}><p className="sl" style={{margin:0}}>✋ 수동 편성 중</p><button className="btn bs" onClick={()=>{setManualDraft(null);setSelPid(null)}} style={{padding:"5px 12px",fontSize:12}}>취소</button></div>
+              <p style={{fontSize:12,color:"var(--tx2)",margin:"0 0 10px",lineHeight:1.5}}>{selPid==null?"① 미배정 선수를 탭해 선택하세요":"② 배치할 조 카드를 탭하세요"} · 배치된 선수를 탭하면 미배정으로 돌아갑니다</p>
+              <p className="sl" style={{fontSize:11,marginBottom:0}}>미배정 ({draftPool.length}명)</p>
+              {draftPool.length?<div className="dp-grid" style={{marginTop:8}}>{draftPool.map(p=><button key={p.id} className={"dp-btn"+(selPid===p.id?" sel":"")} onClick={()=>setSelPid(selPid===p.id?null:p.id)}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""}</div></button>)}</div>
+              :<p style={{fontSize:13,color:"var(--brand)",fontWeight:700,margin:"10px 0 0"}}>✅ 전원 배치 완료 — 아래에서 확정하세요</p>}
+            </div>
+            <div className="cd">
+              <div className="tg">{manualDraft.slots.map((s,si)=>{
+                const open=selPid!=null&&s.players.length<s.cap;
+                return <div key={si} className={"tc"+(s.type==="wc"?" bonus":"")} onClick={()=>draftAssign(si)} style={open?{cursor:"pointer",borderColor:"var(--brand)",boxShadow:"0 0 0 2px var(--brand50)"}:{}}>
+                  <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:s.type==="wc"?"var(--gold)":s.type==="small"?"var(--purple)":"var(--brand)"}}>{s.type==="wc"?"⭐ 와일드카드":s.type==="small"?"소수조":"조 "+(si+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)"}}>{s.players.length}/{s.cap}</span></div>
+                  {s.players.map((p,j)=><div key={j} className="fb" style={{marginTop:4,cursor:"pointer"}} onClick={e=>{e.stopPropagation();draftRemove(si,p.id)}}><span style={{fontSize:14,fontWeight:600}}>{p.name}</span><span className="fg"><GBadge gender={p.gender} /><Badge level={p.skill} /></span></div>)}
+                  {Array.from({length:s.cap-s.players.length}).map((_,j)=><div key={"e"+j} style={{marginTop:4,padding:"4px 0",fontSize:12,color:"var(--tx2)",border:"1px dashed var(--bdr)",borderRadius:7,textAlign:"center"}}>빈 자리</div>)}
+                </div>})}</div>
+              <button className="btn bp bf" onClick={draftDone} disabled={draftPool.length>0} style={{marginTop:12}}>{draftPool.length>0?"미배정 "+draftPool.length+"명 남음":"편성 완료"}</button>
+            </div>
+          </>:!teams.length?<div className="cd es"><div className="es-i">🏸</div><div className="es-t">편성된 조 없음</div></div>:<>
             {extraPlayer&&<div className="cd bye-b">
               <div className="fg" style={{marginBottom:8}}>
                 <span style={{fontSize:20}}>⭐</span>
@@ -1549,16 +1526,7 @@ function App(){
               <div style={{fontSize:15,fontWeight:800,color:"var(--brand)",marginBottom:8}}>🎉 모든 매치 완료!</div>
               <p style={{fontSize:12,color:"var(--tx2)",marginBottom:14}}>기록실에 저장하면 누적 통계에 반영됩니다.</p>
               <button className="btn bgn bf" onClick={saveSession} style={{fontSize:15,padding:"12px 24px"}}>💾 기록실에 저장</button>
-              <button className="btn bs" onClick={function(){
-                var sess={id:Date.now(),date:new Date().toISOString().slice(0,10),teamSize:teamSize,mt:mt,
-                  players:players.map(function(p){return{name:p.name,skill:p.skill,gender:p.gender}}),
-                  matchData:matches.map(function(rd){return rd.matches.map(function(m){return{
-                    t1:(m.team1.players||[]).map(function(p){return p.name}),t2:(m.team2.players||[]).map(function(p){return p.name}),
-                    s1:parseInt(m.s1,10),s2:parseInt(m.s2,10)}})}).flat()};
-                var fn="record_"+sess.date+".json";
-                var bl=new Blob([JSON.stringify([sess],null,2)],{type:"application/json"});
-                shareOrDownload(bl,fn,"와일드콕 기록 "+sess.date,"📥 "+fn+" 다운로드 완료 — 관리자에게 전달해주세요");
-              }} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
+              <button className="btn bs" onClick={function(){shareSession(buildSession())}} style={{fontSize:13,padding:"10px 20px",marginTop:8}}>📤 관리자에게 전송</button>
               <p style={{fontSize:11,color:"var(--tx2)",marginTop:8}}>관리자 부재 시: 저장 후 전송 버튼으로 카톡 전달</p>
             </div>}
           </>}

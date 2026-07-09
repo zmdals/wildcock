@@ -1,0 +1,32 @@
+{
+  "name": "와일드콕 — 배드민턴 클럽 매니저",
+  "short_name": "와일드콕",
+  "description": "조 편성 · 대진표 · 기록 관리",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6F8",
+  "theme_color": "#F5F6F8",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "./uploads/favicon_192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./uploads/favicon_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./uploads/favicon_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
