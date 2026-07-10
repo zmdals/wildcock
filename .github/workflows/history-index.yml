@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════
+# history/index.json 자동 갱신 워크플로
+#
+# 동작: history/ 폴더에 기록 json이 추가·수정·삭제되면
+#       (앱에서 전송했든, GitHub 웹에서 직접 업로드했든)
+#       폴더를 스캔해 index.json 목차를 자동으로 다시 만들어 커밋합니다.
+#
+# 설치: repo의 .github/workflows/history-index.yml 경로에 이 파일을 넣으면 끝.
+#       별도 설정·시크릿 불필요 (기본 GITHUB_TOKEN 사용).
+# ═══════════════════════════════════════════════════════════
+name: history index
+
+on:
+  push:
+    paths:
+      - "history/*.json"
+      - "!history/index.json"   # 자기 자신의 커밋으로 무한 반복되는 것 방지
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: index.json 재생성
+        run: |
+          node -e '
+            const fs = require("fs");
+            const files = fs.readdirSync("history")
+              .filter(f => f.endsWith(".json") && f !== "index.json")
+              .sort();
+            fs.writeFileSync("history/index.json", JSON.stringify({ files }, null, 2) + "\n");
+            console.log("기록 파일", files.length, "개로 목차 생성");
+          '
+
+      - name: 변경 시에만 커밋
+        run: |
+          git config user.name "wildcock-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add history/index.json
+          git diff --cached --quiet || git commit -m "chore: history index 자동 갱신"
+          git push
