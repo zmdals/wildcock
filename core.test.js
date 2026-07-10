@@ -238,5 +238,117 @@ test("최적화 모드가 비최적화 대비 평균 품질 저하 없음", func
   assert(sumOn <= sumOff * 1.05, "최적화 on(" + sumOn + ") > off(" + sumOff + ") — 휴식 최적화가 오히려 악화");
 });
 
+console.log("\n[ELO 레이팅]");
+function mkSession(id,date,names,skills,matchData){
+  return{id:id,date:date,players:names.map(function(n,i){return{name:n,skill:skills[i],gender:null}}),matchData:matchData};
+}
+test("초기값: Lv 반영 (Lv1=1300 ~ Lv5=1700)", function () {
+  eq(C.eloInit(1),1300);eq(C.eloInit(3),1500);eq(C.eloInit(5),1700);eq(C.eloInit(undefined),1500);
+});
+test("승자 상승·패자 하락 + 제로섬 (2v2)", function () {
+  var r=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c","d"],[3,3,3,3],[{t1:["a","b"],t2:["c","d"],s1:21,s2:15}])]);
+  assert(r.ratings.a>1500&&r.ratings.b>1500,"승자 미상승");
+  assert(r.ratings.c<1500&&r.ratings.d<1500,"패자 미하락");
+  eq(r.ratings.a,r.ratings.b,"팀원 동일 변동 아님");
+  var sum=r.ratings.a+r.ratings.b+r.ratings.c+r.ratings.d;
+  assert(Math.abs(sum-6000)<1e-9,"제로섬 위반: "+sum);
+  eq(r.games.a,1);
+});
+test("점수차 가중: 압살이 접전보다 변동 큼", function () {
+  var close=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c","d"],[3,3,3,3],[{t1:["a","b"],t2:["c","d"],s1:21,s2:19}])]);
+  var blowout=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c","d"],[3,3,3,3],[{t1:["a","b"],t2:["c","d"],s1:21,s2:5}])]);
+  assert(blowout.ratings.a-1500>close.ratings.a-1500,"압살("+(blowout.ratings.a-1500).toFixed(1)+") <= 접전("+(close.ratings.a-1500).toFixed(1)+")");
+});
+test("팀 단위 기대승률: 약팀 승리가 강팀 승리보다 변동 큼", function () {
+  var upset=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c","d"],[1,1,5,5],[{t1:["a","b"],t2:["c","d"],s1:21,s2:15}])]);
+  var expected=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c","d"],[5,5,1,1],[{t1:["a","b"],t2:["c","d"],s1:21,s2:15}])]);
+  var upsetGain=upset.ratings.a-C.eloInit(1),expectedGain=expected.ratings.a-C.eloInit(5);
+  assert(upsetGain>expectedGain,"이변 보상("+upsetGain.toFixed(1)+") <= 예상승("+expectedGain.toFixed(1)+")");
+});
+test("시간순 소급: 세션 순서를 섞어 넣어도 결과 동일 (결정적)", function () {
+  var s1=mkSession(1,"2026-01-01",["a","b","c","d"],[3,3,3,3],[{t1:["a","b"],t2:["c","d"],s1:21,s2:10}]);
+  var s2=mkSession(2,"2026-02-01",["a","b","c","d"],[3,3,3,3],[{t1:["a","c"],t2:["b","d"],s1:15,s2:21}]);
+  var r1=C.eloCompute([s1,s2]),r2=C.eloCompute([s2,s1]);
+  ["a","b","c","d"].forEach(function(n){assert(Math.abs(r1.ratings[n]-r2.ratings[n])<1e-9,n+" 순서 의존")});
+});
+test("잘못된 매치 무시 (점수 없음·동점·빈 팀) + 고정파트너 양팀 출전 시 상쇄", function () {
+  var r=C.eloCompute([mkSession(1,"2026-01-01",["a","b","c"],[3,3,3],[
+    {t1:["a","b"],t2:["c"],s1:"",s2:""},
+    {t1:["a","b"],t2:["c"],s1:21,s2:21},
+    {t1:[],t2:["c"],s1:21,s2:1},
+    {t1:["a","x"],t2:["c","x"],s1:21,s2:10}
+  ])]);
+  eq(r.games.a,1,"유효 매치는 1개여야 함");
+  assert(Math.abs(r.ratings.x-1500)<1e-9,"양팀 출전자는 변동 상쇄돼야 함");
+});
+test("eloToLevel 구간", function () {
+  eq(C.eloToLevel(1300),1);eq(C.eloToLevel(1400),2);eq(C.eloToLevel(1500),3);eq(C.eloToLevel(1600),4);eq(C.eloToLevel(1700),5);
+});
+
+console.log("\n[ELO 성별 구성 보정]");
+/* 합성 데이터: 레이팅상 동급인데 MM팀이 MF팀을 70% 승률로 이기는 클럽 */
+function mkGenderedSessions(crossMatches,mmWinRate){
+  var names=["M1","M2","M3","M4","F1","F2","F3","F4"];
+  var players=names.map(function(n){return{name:n,skill:3,gender:n[0]}});
+  var md=[];
+  for(var i=0;i<crossMatches;i++){
+    var mm=[names[i%2*2],names[i%2*2+1]];               /* M1M2 / M3M4 교대 */
+    var mf=[names[2-(i%2)*2],names[4+i%4]];             /* 남녀 혼성 */
+    var mmWins=i<Math.round(crossMatches*mmWinRate);
+    md.push(mmWins?{t1:mm,t2:mf,s1:21,s2:14}:{t1:mm,t2:mf,s1:14,s2:21});
+  }
+  /* 동일 구성 매치도 섞음 (앵커) */
+  for(var j=0;j<10;j++){
+    md.push({t1:["M1","F1"],t2:["M3","F3"],s1:j%2?21:15,s2:j%2?15:21});
+  }
+  return[{id:1,date:"2026-01-01",players:players,matchData:md}];
+}
+test("MM 우세 데이터 → 보정치 V.MM > 0 (MF 기준)", function () {
+  var est=C.eloEstimateCompBonus(mkGenderedSessions(30,0.7));
+  eq(est.bonus.MF,0,"MF는 기준 0이어야 함");
+  assert(est.bonus.MM>10,"MM 보정이 유의미하게 양수여야 함: "+est.bonus.MM.toFixed(1));
+  assert(est.bonus.MM<=120,"상한 초과");
+});
+test("보정 적용 시 여성 레이팅 오염 감소 (미적용 대비 상승)", function () {
+  var sess=mkGenderedSessions(30,0.7);
+  var raw=C.eloCompute(sess);
+  var est=C.eloEstimateCompBonus(sess);
+  var adj=C.eloCompute(sess,32,est.bonus);
+  var rawF=(raw.ratings.F1+raw.ratings.F2+raw.ratings.F3+raw.ratings.F4)/4;
+  var adjF=(adj.ratings.F1+adj.ratings.F2+adj.ratings.F3+adj.ratings.F4)/4;
+  assert(adjF>rawF,"보정 후 여성 평균("+adjF.toFixed(0)+")이 미보정("+rawF.toFixed(0)+")보다 높아야 함");
+});
+test("교차 구성 표본 부족 시 보정 ≈ 0 (무해성)", function () {
+  var est=C.eloEstimateCompBonus(mkGenderedSessions(3,1.0)); /* 3매치 전승이라도 */
+  assert(Math.abs(est.bonus.MM)<40,"소표본 보정이 과해선 안 됨: "+est.bonus.MM.toFixed(1));
+});
+test("동일 구성 매치만 있으면 보정 0", function () {
+  var players=[{name:"a",skill:3,gender:"M"},{name:"b",skill:3,gender:"M"},{name:"c",skill:3,gender:"M"},{name:"d",skill:3,gender:"M"}];
+  var est=C.eloEstimateCompBonus([{id:1,date:"2026-01-01",players:players,matchData:[{t1:["a","b"],t2:["c","d"],s1:21,s2:10}]}]);
+  eq(est.bonus.MM,0);eq(est.bonus.FF,0);
+});
+test("역호환: bonus 미지정 eloCompute는 기존 결과와 동일", function () {
+  var sess=mkGenderedSessions(10,0.5);
+  var r1=C.eloCompute(sess),r2=C.eloCompute(sess,32,{MM:0,MF:0,FF:0});
+  Object.keys(r1.ratings).forEach(function(n){assert(Math.abs(r1.ratings[n]-r2.ratings[n])<1e-9,n)});
+});
+test("성별 미상·3인조 팀은 보정 미적용 (null comp)", function () {
+  eq(C.eloTeamComp(["a","b"],{a:"M",b:null}),null);
+  eq(C.eloTeamComp(["a","b","c"],{a:"M",b:"M",c:"M"}),null);
+  eq(C.eloTeamComp(["a","b"],{a:"M",b:"F"}),"MF");
+  eq(C.eloTeamComp(["a","b"],{a:"F",b:"F"}),"FF");
+});
+
+test("표본이 커질수록 보정치 단조 증가 (레이팅 흡수에 면역)", function () {
+  var v30=C.eloEstimateCompBonus(mkGenderedSessions(30,0.7)).bonus.MM;
+  var v100=C.eloEstimateCompBonus(mkGenderedSessions(100,0.7)).bonus.MM;
+  var v200=C.eloEstimateCompBonus(mkGenderedSessions(200,0.7)).bonus.MM;
+  assert(v30>0&&v100>v30&&v200>=v100,"단조성 위반: "+v30.toFixed(1)+" → "+v100.toFixed(1)+" → "+v200.toFixed(1));
+});
+test("우세 없는 데이터(승률 50%)면 보정 0", function () {
+  var v=C.eloEstimateCompBonus(mkGenderedSessions(200,0.5)).bonus;
+  assert(Math.abs(v.MM)<5&&Math.abs(v.FF)<5,"허위 보정 발생: MM="+v.MM.toFixed(1));
+});
+
 console.log("\n결과: " + passed + " 통과, " + failed + " 실패");
 process.exit(failed ? 1 : 0);

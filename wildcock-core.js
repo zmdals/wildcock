@@ -208,11 +208,109 @@ function scheduleSlots(rounds,cc,optimize){
   return best;
 }
 
+/* ── ELO 레이팅 ──
+   설계: 팀 전력 = 팀 평균 레이팅 + 성별 구성 보정치(MM/MF/FF)
+         기대승률은 팀 전력끼리 비교 → 승패 + 완만한 점수차 가중(×1.0~1.5)
+         → 팀원 두 명은 동일하게 오르내림 (개인별 차등 없음)
+   구성 보정: 남남팀이 구조적으로 유리하다면 그 유리함을 보정치가 흡수해서
+              개인 레이팅이 "구성 탓" 승패로 오염되는 것을 막음
+   초기값: 1500 + (Lv−3)×100 → Lv1=1300 ~ Lv5=1700 */
+function eloInit(skill){return 1500+(((+skill||3))-3)*100}
+function eloExpected(rA,rB){return 1/(1+Math.pow(10,(rB-rA)/400))}
+/* 점수차 가중: 21-19 → ×1.05, 21-11 → ×1.24, 21-0 → ×1.5 */
+function eloMargin(s1,s2){const a=+s1,b=+s2,mx=Math.max(a,b);if(!mx)return 1;return 1+0.5*Math.min(1,Math.abs(a-b)/mx)}
+/* 2인 팀의 성별 구성 — 성별 미상·2인 아님 → null (보정 미적용) */
+function eloTeamComp(names,genderOf){
+  if(!names||names.length!==2)return null;
+  const g1=genderOf[names[0]],g2=genderOf[names[1]];
+  if(!g1||!g2)return null;
+  return g1===g2?(g1==="M"?"MM":"FF"):"MF";
+}
+/* 세션 배열 전체를 시간순 소급 계산
+   bonus: {MM,MF,FF} 구성 보정치(점) — 생략 시 0 (미보정과 동일)
+   반환: {ratings:{이름:레이팅}, games:{이름:경기수}} */
+function eloCompute(sessions,K,bonus){
+  K=K||32;const B=bonus||{};
+  const R={},G={};
+  const sorted=[...(sessions||[])].sort((a,b)=>{const d1=a&&a.date||"",d2=b&&b.date||"";return d1<d2?-1:d1>d2?1:((a&&a.id)||0)-((b&&b.id)||0)});
+  for(const s of sorted){
+    if(!s)continue;
+    const skillOf={},genderOf={};
+    (s.players||[]).forEach(p=>{if(p&&p.name){skillOf[p.name]=p.skill;genderOf[p.name]=p.gender||null}});
+    for(const m of(s.matchData||[])){
+      const s1=+m.s1,s2=+m.s2;
+      if(!isFinite(s1)||!isFinite(s2)||s1===s2)continue;
+      const t1=(m.t1||[]).filter(Boolean),t2=(m.t2||[]).filter(Boolean);
+      if(!t1.length||!t2.length)continue;
+      t1.concat(t2).forEach(n=>{if(R[n]==null){R[n]=eloInit(skillOf[n]);G[n]=0}});
+      const r1=t1.reduce((a,n)=>a+R[n],0)/t1.length;
+      const r2=t2.reduce((a,n)=>a+R[n],0)/t2.length;
+      const c1=eloTeamComp(t1,genderOf),c2=eloTeamComp(t2,genderOf);
+      const e1=eloExpected(r1+(B[c1]||0),r2+(B[c2]||0));
+      const d=K*eloMargin(s1,s2)*((s1>s2?1:0)-e1);
+      t1.forEach(n=>{R[n]+=d;G[n]++});
+      t2.forEach(n=>{R[n]-=d;G[n]++});
+    }
+  }
+  return{ratings:R,games:G};
+}
+/* 구성 보정치 추정 — "선수 내 대조" 방식 (레이팅 비의존 → 흡수·오염 원천 차단)
+   원리: 같은 선수가 MM팀일 때와 MF팀일 때의 승률 차이에는 본인 실력이 양쪽에
+         똑같이 들어가 상쇄되고, 순수한 구성 효과만 남는다.
+   · 교차 구성 매치만 사용, 두 구성 이상을 경험한 선수만 신호에 기여
+   · 축소: 가상 매치 N0=40 (표본 3개면 보정 미미, 쌓일수록 실측에 수렴)
+   · 파트너 셔플이 전제 — 특정인이 한 구성에만 고정 출전하면 그 사람 몫의 신호는 없음
+   · 정규화: 혼성(MF)=0 기준 · 상한 ±120점 */
+function eloEstimateCompBonus(sessions){
+  const N0=40;
+  const per={};
+  for(const s of(sessions||[])){
+    if(!s)continue;
+    const genderOf={};(s.players||[]).forEach(p=>{if(p&&p.name)genderOf[p.name]=p.gender||null});
+    for(const m of(s.matchData||[])){
+      const s1=+m.s1,s2=+m.s2;
+      if(!isFinite(s1)||!isFinite(s2)||s1===s2)continue;
+      const t1=(m.t1||[]).filter(Boolean),t2=(m.t2||[]).filter(Boolean);
+      const c1=eloTeamComp(t1,genderOf),c2=eloTeamComp(t2,genderOf);
+      if(!c1||!c2||c1===c2)continue;
+      const rec=(names,c,w)=>names.forEach(n=>{
+        const p=per[n]||(per[n]={n:0,w:0,comps:{}});
+        const pc=p.comps[c]||(p.comps[c]={n:0,w:0});
+        p.n++;p.w+=w;pc.n++;pc.w+=w;
+      });
+      rec(t1,c1,s1>s2?1:0);rec(t2,c2,s1>s2?0:1);
+    }
+  }
+  const agg={MM:{n:0,ex:0},MF:{n:0,ex:0},FF:{n:0,ex:0}};
+  Object.keys(per).forEach(name=>{
+    const p=per[name];
+    if(Object.keys(p.comps).length<2)return; /* 한 구성만 경험 → 대조 불가 */
+    const wbar=p.w/p.n;
+    Object.keys(p.comps).forEach(c=>{
+      agg[c].n+=p.comps[c].n;
+      agg[c].ex+=p.comps[c].w-p.comps[c].n*wbar; /* Σ(승패 − 개인평균) */
+    });
+  });
+  const V={MM:0,MF:0,FF:0};
+  ["MM","MF","FF"].forEach(c=>{
+    if(!agg[c].n)return;
+    const e=Math.max(-0.49,Math.min(0.49,agg[c].ex/(agg[c].n+N0)));
+    /* ×0.5: 같은 매치가 양쪽 구성에 대칭 기여해 차이가 2배로 잡히는 것 보정 */
+    V[c]=0.5*400*Math.log10((0.5+e)/(0.5-e));
+  });
+  const ref=V.MF;
+  ["MM","MF","FF"].forEach(c=>{V[c]=Math.max(-120,Math.min(120,V[c]-ref))});
+  return{bonus:V,stats:agg};
+}
+/* 레이팅 → 추천 레벨 구간 */
+function eloToLevel(r){return r<1350?1:r<1450?2:r<1550?3:r<1650?4:5}
+
 global.WC_CORE={
   toBase64,fromBase64,
   SK_L,SK_C,GEN_C,GEN_L,COURT_C,
   shuffle,balanced2,random2,balanced3,random3,mixedPair,
   sharePlayer,tn,tsk,tid,
-  genRR,genRRWildcard,genT,assignCourts,scheduleSlots
+  genRR,genRRWildcard,genT,assignCourts,scheduleSlots,
+  eloInit,eloExpected,eloMargin,eloTeamComp,eloCompute,eloEstimateCompBonus,eloToLevel
 };
 })(typeof window!=="undefined"?window:globalThis);
