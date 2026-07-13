@@ -6,12 +6,16 @@
    장점: 온라인일 땐 항상 최신 파일 → 업데이트가 막히지 않음
          오프라인일 땐 마지막으로 본 버전으로 정상 동작
 
-   ⚠️ 배포 시 app.jsx/core 버전(?v=)을 올리면 아래 SW_VERSION도 같이 올려주세요.
-      (구 캐시 정리 + 프리캐시 목록 갱신을 위해)
+   ✅ 버전 단일화: 이 파일은 자기 URL의 ?v= 값에서 버전을 읽습니다.
+      배포 시 index.html의 버전(?v=)만 올리면 SW·캐시·프리캐시가 함께 갱신돼요.
+      (index.html에서 sw.js?v=..., app.jsx?v=..., wildcock-core.js?v=... 를 같은 값으로)
    ═══════════════════════════════════════════════════════════ */
 "use strict";
 
-var SW_VERSION = "20260709";
+var SW_VERSION = (function () {
+  try { return new URL(self.location.href).searchParams.get("v") || "base"; }
+  catch (e) { return "base"; }
+})();
 var CACHE_NAME = "wildcock-" + SW_VERSION;
 
 /* 설치 직후부터 오프라인이 가능하도록 미리 담아두는 핵심 파일(앱 셸) */
@@ -19,8 +23,8 @@ var PRECACHE = [
   "./",
   "./index.html",
   "./support.js",
-  "./wildcock-core.js?v=20260709",
-  "./app.jsx?v=20260709",
+  "./wildcock-core.js?v=" + SW_VERSION,
+  "./app.jsx?v=" + SW_VERSION,
   "./manifest.json",
   "./uploads/favicon_32.png",
   "./uploads/favicon_192.png",

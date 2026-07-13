@@ -12,12 +12,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="와일드콕" />
 <script src="./support.js"></script>
-<script src="./wildcock-core.js?v=20260709"></script>
+<script src="./wildcock-core.js?v=20260713"></script>
 <script>
-/* PWA: Service Worker 등록 — 지원 브라우저에서만, 페이지 로드 후 조용히 */
+/* PWA: Service Worker 등록 — 버전은 아래 ?v= 하나로 관리 (app.jsx·core와 같은 값 유지) */
 if("serviceWorker" in navigator){
   window.addEventListener("load",function(){
-    navigator.serviceWorker.register("./sw.js").catch(function(){});
+    navigator.serviceWorker.register("./sw.js?v=20260713").catch(function(){});
   });
 }
 </script>
@@ -33,7 +33,7 @@ if("serviceWorker" in navigator){
     @media(prefers-color-scheme:dark){body{background:#111316}}
   </style>
 </helmet>
-<x-import component-from-global-scope="WildcockApp" from="./app.jsx?v=20260709" hint-size="100%,100%"></x-import>
+<x-import component-from-global-scope="WildcockApp" from="./app.jsx?v=20260713" hint-size="100%,100%"></x-import>
 </x-dc>
 </body>
 </html>

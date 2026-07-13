@@ -982,8 +982,9 @@ function App(){
   const[pm,setPm]=useState(()=>_ss.pm||"random");const[mixed,setMixed]=useState(()=>_ss.mixed||false);const[teamSize,setTeamSize]=useState(()=>_ss.teamSize||2);const[wildcardId,setWildcardId]=useState(()=>_ss.wildcardId!=null?_ss.wildcardId:null);
   const[mt,setMt]=useState(()=>_ss.mt||"roundrobin");const[courtCount,setCourtCount]=useState(()=>_ss.courtCount||1);const[restMode,setRestMode]=useState(()=>_ss.restMode||false);const[wcMode,setWcMode]=useState(()=>_ss.wcMode||"rotating");
   const[matches,setMatches]=useState(()=>_ss.matches||[]);
-  /* 수동 편성 드래프트 (확정 전 임시 상태) — {slots:[{cap,type:"team"|"wc"|"small",players:[]}]} */
-  const[manualDraft,setManualDraft]=useState(null);const[selPid,setSelPid]=useState(null);
+  /* 수동 편성 드래프트 (확정 전 임시 상태) — 새로고침에도 보존 */
+  const[manualDraft,setManualDraft]=useState(()=>{try{return JSON.parse(localStorage.getItem("wc_draft"))||null}catch{return null}});
+  useEffect(()=>{try{if(manualDraft)localStorage.setItem("wc_draft",JSON.stringify(manualDraft));else localStorage.removeItem("wc_draft")}catch{}},[manualDraft]);
   const[eid,setEid]=useState(null);const[en,setEn]=useState("");const[esk,setEsk]=useState(3);const[eg,setEg]=useState(null);
   const[rNames,setRN]=useState("");const[rCnt,setRC]=useState(1);const[rSrc,setRS]=useState("custom");
   const[confetti,setConfetti]=useState(false);
@@ -1036,15 +1037,35 @@ function App(){
   };
   const[rosterOpen,setRosterOpen]=useState(false);const[rosterSel,setRosterSel]=useState({});
   const[recLvOn,setRecLvOn]=useState(true);const[rosterManage,setRosterManage]=useState(false);
-  /* ELO: 내 기록 + 공용 기록 합집합(세션 id 중복 제거)을 시간순 소급 계산
-     성별 구성 보정(남남/혼성/여여의 구조적 유불리)을 기록에서 추정해 적용 */
-  const eloData=useMemo(()=>{
+  /* 내 기록 + 공용 기록 합집합 (세션 id 중복 제거) */
+  const allSessions=useMemo(()=>{
     const seen=new Set(),all=[];
     [...history,...(pubHistory||[])].forEach(s=>{if(!s)return;if(s.id!=null){if(seen.has(s.id))return;seen.add(s.id)}all.push(s)});
-    const est=eloEstimateCompBonus(all);
-    const r=eloCompute(all,32,est.bonus);
-    return{ratings:r.ratings,games:r.games,compBonus:est.bonus};
+    return all;
   },[history,pubHistory]);
+  /* ELO: 전체 기록을 시간순 소급 계산 + 성별 구성 보정 추정·적용 */
+  const eloData=useMemo(()=>{
+    const est=eloEstimateCompBonus(allSessions);
+    const r=eloCompute(allSessions,32,est.bonus);
+    return{ratings:r.ratings,games:r.games,compBonus:est.bonus};
+  },[allSessions]);
+  /* 기록에 등장한 멤버 — 최신 세션 우선으로 성별·마지막 레벨 채택 */
+  const recordMembers=useMemo(()=>{
+    const sorted=[...allSessions].sort((a,b)=>{const d1=a.date||"",d2=b.date||"";return d1>d2?-1:d1<d2?1:((b.id||0)-(a.id||0))});
+    const map={};
+    sorted.forEach(s=>{(s.players||[]).forEach(p=>{
+      if(!p||!p.name)return;
+      if(!map[p.name])map[p.name]={name:p.name,skill:p.skill||3,gender:p.gender||null};
+      else if(!map[p.name].gender&&p.gender)map[p.name].gender=p.gender;
+    })});
+    return Object.values(map);
+  },[allSessions]);
+  /* 불러오기 목록: 저장된 명부(우선) + 기록 멤버(_rec 표시) */
+  const rosterAll=useMemo(()=>{
+    const names=new Set(roster.map(m=>m.name));
+    return[...roster,...recordMembers.filter(m=>!names.has(m.name)).map(m=>({...m,_rec:true}))]
+      .sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  },[roster,recordMembers]);
   /* 추천 Lv — 3경기 미만이면 저장값(fallback) 유지 */
   const recommendLv=(name,fallback)=>{const g=eloData.games[name]||0;if(g<3)return fallback;return eloToLevel(eloData.ratings[name])};
   useEffect(()=>{try{localStorage.setItem("bp_history",JSON.stringify(history))}catch{}},[history]);
@@ -1056,7 +1077,7 @@ function App(){
     var DIR="history";
     function loadFiles(names){
       return Promise.all(names.map(function(name){
-        return fetch(DIR+"/"+name).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
+        return fetch(DIR+"/"+name,{cache:"no-cache"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
       }));
     }
     function apply(results){
@@ -1261,8 +1282,8 @@ function App(){
     }catch{return null}
   },[allTeams,matches,mt]);
 
-  const warnReset=()=>{if(teams.length>0||manualDraft){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setManualDraft(null);setSelPid(null);toast.show("초기화됨")}return true};
-  const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);setManualDraft(null);setSelPid(null);toast.show("전체 초기화 완료")};
+  const warnReset=()=>{if(teams.length>0||manualDraft){if(!window.confirm("조 편성/매치가 초기화됩니다.\n계속?"))return false;setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setManualDraft(null);toast.show("초기화됨")}return true};
+  const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);setManualDraft(null);toast.show("전체 초기화 완료")};
   const addP=()=>{const name=nn.trim();if(!name)return;if(players.some(p=>p.name===name)){toast.show("⚠️ 이미 등록됨");return}if(!warnReset())return;setPlayers(p=>[...p,{id:nid,name,skill:ns,gender:ng}]);setNn("");setNs(3);setNg(null);toast.show("✅ "+name)};
 
   /* ── 클럽원 명부 ── */
@@ -1280,7 +1301,7 @@ function App(){
   };
   const removeFromRoster=(name)=>{if(!window.confirm(name+" 님을 명부에서 삭제할까요?\n(공유 명부에서도 삭제됩니다)"))return;commitRoster(roster.filter(m=>m.name!==name))};
   const loadFromRoster=()=>{
-    const sel=roster.filter(m=>rosterSel[m.name]&&!players.some(p=>p.name===m.name));
+    const sel=rosterAll.filter(m=>rosterSel[m.name]&&!players.some(p=>p.name===m.name));
     if(!sel.length){toast.show("불러올 선수를 선택하세요");return}
     if(!warnReset())return;
     setPlayers(prev=>{
@@ -1302,7 +1323,7 @@ function App(){
       for(let i=0;i<Math.floor(n/teamSize);i++)slots.push({cap:teamSize,type:"team",players:[]});
       if(remM===1)slots.push({cap:1,type:"wc",players:[]});
       if(remM===2&&teamSize===3)slots.push({cap:2,type:"small",players:[]});
-      setManualDraft({slots});setSelPid(null);
+      setManualDraft({slots});
       setTeams([]);setExtraPlayer(null);setDualPartner(null);setMatches([]);setSubTab("teams");return;
     }
     let act=[...players],extra=null;const rem=act.length%teamSize;
@@ -1335,15 +1356,31 @@ function App(){
 
   /* ── 수동 편성 헬퍼 ── */
   const draftPool=manualDraft?players.filter(p=>!manualDraft.slots.some(s=>s.players.some(q=>q.id===p.id))):[];
-  const draftAssign=(si)=>{
-    if(selPid==null||!manualDraft)return;
-    const pl=players.find(p=>p.id===selPid);if(!pl)return;
-    const slot=manualDraft.slots[si];
-    if(slot.players.length>=slot.cap){toast.show("이 조는 가득 찼어요");return}
-    setManualDraft({slots:manualDraft.slots.map((s,i)=>i===si?{...s,players:[...s.players,pl]}:s)});
-    setSelPid(null);
+  /* 순서 입력: 탭한 선수가 "빈자리가 있는 첫 조"에 자동 배치 (와일드카드 슬롯은 배열 마지막이라 자연히 마지막 1명) */
+  const draftNextIdx=manualDraft?manualDraft.slots.findIndex(s=>s.players.length<s.cap):-1;
+  const draftTap=(pl)=>{
+    if(!manualDraft||draftNextIdx<0)return;
+    setManualDraft({slots:manualDraft.slots.map((s,i)=>i===draftNextIdx?{...s,players:[...s.players,pl]}:s)});
   };
   const draftRemove=(si,pid)=>{if(!manualDraft)return;setManualDraft({slots:manualDraft.slots.map((s,i)=>i===si?{...s,players:s.players.filter(p=>p.id!==pid)}:s)})};
+  /* 나머지 자동 채우기: 남은 선수를 스킬 높은 순으로, 스킬 합이 가장 낮은 조부터 채움 (밸런스 근사) */
+  const draftAutoFill=()=>{
+    if(!manualDraft||!draftPool.length)return;
+    const slots=manualDraft.slots.map(s=>({...s,players:[...s.players]}));
+    const pool=[...draftPool].sort((a,b)=>b.skill-a.skill);
+    for(const pl of pool){
+      const cand=slots.map((s,i)=>({s,i})).filter(x=>x.s.players.length<x.s.cap);
+      const nonWc=cand.filter(x=>x.s.type!=="wc"); /* 와일드카드 자리는 최후에 */
+      const pick=(nonWc.length?nonWc:cand).sort((a,b)=>{
+        const sa=a.s.players.reduce((t,p)=>t+(p.skill||0),0),sb=b.s.players.reduce((t,p)=>t+(p.skill||0),0);
+        return sa-sb||a.i-b.i;
+      })[0];
+      if(!pick)break;
+      slots[pick.i].players.push(pl);
+    }
+    setManualDraft({slots});
+    toast.show("⚖️ 나머지 자동 배치 완료 — 확인 후 확정하세요");
+  };
   const draftDone=()=>{
     if(!manualDraft||draftPool.length)return;
     const real=manualDraft.slots.filter(s=>s.type==="team").map(s=>({players:s.players}));
@@ -1351,7 +1388,7 @@ function App(){
     if(small)real.push({players:small.players,isSmall:true});
     const wc=manualDraft.slots.find(s=>s.type==="wc");
     setTeams(real);setExtraPlayer(wc?wc.players[0]:null);setDualPartner(null);setMatches([]);
-    setManualDraft(null);setSelPid(null);
+    setManualDraft(null);
     toast.show("✋ 수동 편성 완료");
   };
 
@@ -1447,19 +1484,20 @@ function App(){
             </div>
           </div>
           <div className="cd">
-            <div className="fb"><p className="sl" style={{margin:0}}>👥 클럽원 명부{roster.length?` (${roster.length}명)`:""}</p>
+            <div className="fb"><p className="sl" style={{margin:0}}>👥 클럽원{rosterAll.length?` (${rosterAll.length}명)`:""}</p>
               <div className="fg" style={{gap:6}}>
                 <button className="btn bs" onClick={saveToRoster} style={{padding:"5px 11px",fontSize:12}}>현재 선수 저장</button>
-                {roster.length>0&&<button className="btn bs" onClick={()=>{setRosterOpen(!rosterOpen);setRosterSel({});setRosterManage(false)}} style={{padding:"5px 11px",fontSize:12}}>{rosterOpen?"닫기":"불러오기"}</button>}
+                {rosterAll.length>0&&<button className="btn bs" onClick={()=>{setRosterOpen(!rosterOpen);setRosterSel({});setRosterManage(false)}} style={{padding:"5px 11px",fontSize:12}}>{rosterOpen?"닫기":"불러오기"}</button>}
               </div>
             </div>
-            {!roster.length&&<p style={{fontSize:12,color:"var(--tx2)",margin:"10px 0 0",lineHeight:1.5}}>선수를 등록한 뒤 "현재 선수 저장"을 누르면 다음 모임부터 탭 몇 번으로 불러올 수 있어요.</p>}
-            {rosterOpen&&roster.length>0&&<>
-              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:600,color:"var(--tx)",margin:"12px 0 4px",cursor:"pointer"}}>
+            {!rosterAll.length&&<p style={{fontSize:12,color:"var(--tx2)",margin:"10px 0 0",lineHeight:1.5}}>선수를 등록한 뒤 "현재 선수 저장"을 누르면 다음 모임부터 탭 몇 번으로 불러올 수 있어요. 매치 기록이 쌓이면 기록 속 멤버도 자동으로 나타나요.</p>}
+            {rosterOpen&&rosterAll.length>0&&<>
+              {!rosterManage&&<label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:600,color:"var(--tx)",margin:"12px 0 4px",cursor:"pointer"}}>
                 <input type="checkbox" checked={recLvOn} onChange={e=>setRecLvOn(e.target.checked)} style={{width:16,height:16,accentColor:"var(--brand)"}} />
                 📈 추천 Lv 자동 설정<span style={{fontSize:11,color:"var(--tx2)",fontWeight:400}}>(전체 기록 기반 · 3경기 미만은 저장값)</span>
-              </label>
-              <div className="dp-grid">{roster.map(m=>{
+              </label>}
+              {rosterManage&&<p style={{fontSize:12,color:"var(--tx2)",margin:"12px 0 4px"}}>탭해서 삭제 — 저장된 명부만 삭제할 수 있어요 (기록 멤버는 기록에서 자동 표시)</p>}
+              <div className="dp-grid">{(rosterManage?roster:rosterAll).map(m=>{
                 const inSession=players.some(p=>p.name===m.name);
                 const rl=recommendLv(m.name,m.skill);
                 const showLv=recLvOn?rl:m.skill;
@@ -1467,11 +1505,11 @@ function App(){
                   onClick={()=>{if(rosterManage){removeFromRoster(m.name)}else{setRosterSel(s=>({...s,[m.name]:!s[m.name]}))}}}
                   style={inSession&&!rosterManage?{opacity:.45}:{}}>
                   <div style={{fontSize:13,fontWeight:700}}>{rosterManage?"🗑 ":""}{m.name}{inSession?" ✓":""}</div>
-                  <div style={{fontSize:11,color:recLvOn&&rl!==m.skill?"var(--brand)":"var(--tx2)",marginTop:2,fontWeight:recLvOn&&rl!==m.skill?700:400}}>{recLvOn&&rl!==m.skill?`Lv.${m.skill}→${rl} 📈`:`Lv.${showLv}`}{m.gender?" · "+GEN_L[m.gender]:""}</div>
+                  <div style={{fontSize:11,color:recLvOn&&rl!==m.skill?"var(--brand)":"var(--tx2)",marginTop:2,fontWeight:recLvOn&&rl!==m.skill?700:400}}>{recLvOn&&rl!==m.skill?`Lv.${m.skill}→${rl} 📈`:`Lv.${showLv}`}{m.gender?" · "+GEN_L[m.gender]:""}{m._rec?" · 기록":""}</div>
                 </button>})}
               </div>
               {!rosterManage&&<button className="btn bp bf" onClick={loadFromRoster} disabled={!Object.keys(rosterSel).some(k=>rosterSel[k])} style={{marginTop:12}}>선택한 {Object.keys(rosterSel).filter(k=>rosterSel[k]).length}명 불러오기</button>}
-              <button onClick={()=>{setRosterManage(!rosterManage);setRosterSel({})}} style={{background:"none",border:"none",color:"var(--tx2)",fontSize:11,marginTop:10,cursor:"pointer",padding:0,fontFamily:"inherit",textDecoration:"underline"}}>{rosterManage?"편집 완료":"명부 편집 (탭해서 삭제)"}</button>
+              {roster.length>0&&<button onClick={()=>{setRosterManage(!rosterManage);setRosterSel({})}} style={{background:"none",border:"none",color:"var(--tx2)",fontSize:11,marginTop:10,cursor:"pointer",padding:0,fontFamily:"inherit",textDecoration:"underline"}}>{rosterManage?"편집 완료":"명부 편집 (탭해서 삭제)"}</button>}
             </>}
           </div>
           <div className="cd">
@@ -1506,18 +1544,20 @@ function App(){
         {subTab==="teams"&&<div>
           {manualDraft?<>
             <div className="cd">
-              <div className="fb" style={{marginBottom:6}}><p className="sl" style={{margin:0}}>✋ 수동 편성 중</p><button className="btn bs" onClick={()=>{setManualDraft(null);setSelPid(null)}} style={{padding:"5px 12px",fontSize:12}}>취소</button></div>
-              <p style={{fontSize:12,color:"var(--tx2)",margin:"0 0 10px",lineHeight:1.5}}>{selPid==null?"① 미배정 선수를 탭해 선택하세요":"② 배치할 조 카드를 탭하세요"} · 배치된 선수를 탭하면 미배정으로 돌아갑니다</p>
+              <div className="fb" style={{marginBottom:6}}><p className="sl" style={{margin:0}}>✋ 수동 편성 중</p><button className="btn bs" onClick={()=>setManualDraft(null)} style={{padding:"5px 12px",fontSize:12}}>취소</button></div>
+              <p style={{fontSize:12,color:"var(--tx2)",margin:"0 0 10px",lineHeight:1.5}}>탭하는 순서대로 조가 채워져요 · 배치된 선수를 탭하면 되돌아옵니다{manualDraft.slots.some(s=>s.type==="wc")?" · 마지막 1명은 ⭐와일드카드":""}</p>
               <p className="sl" style={{fontSize:11,marginBottom:0}}>미배정 ({draftPool.length}명)</p>
-              {draftPool.length?<div className="dp-grid" style={{marginTop:8}}>{draftPool.map(p=><button key={p.id} className={"dp-btn"+(selPid===p.id?" sel":"")} onClick={()=>setSelPid(selPid===p.id?null:p.id)}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""}</div></button>)}</div>
-              :<p style={{fontSize:13,color:"var(--brand)",fontWeight:700,margin:"10px 0 0"}}>✅ 전원 배치 완료 — 아래에서 확정하세요</p>}
+              {draftPool.length?<>
+                <div className="dp-grid" style={{marginTop:8}}>{draftPool.map(p=><button key={p.id} className="dp-btn" onClick={()=>draftTap(p)}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>Lv.{p.skill}{p.gender?" "+GEN_L[p.gender]:""}</div></button>)}</div>
+                <button className="btn bs bf" onClick={draftAutoFill} style={{marginTop:10}}>⚖️ 나머지 자동 채우기 (밸런스)</button>
+              </>:<p style={{fontSize:13,color:"var(--brand)",fontWeight:700,margin:"10px 0 0"}}>✅ 전원 배치 완료 — 아래에서 확정하세요</p>}
             </div>
             <div className="cd">
               <div className="tg">{manualDraft.slots.map((s,si)=>{
-                const open=selPid!=null&&s.players.length<s.cap;
-                return <div key={si} className={"tc"+(s.type==="wc"?" bonus":"")} onClick={()=>draftAssign(si)} style={open?{cursor:"pointer",borderColor:"var(--brand)",boxShadow:"0 0 0 2px var(--brand50)"}:{}}>
-                  <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:s.type==="wc"?"var(--gold)":s.type==="small"?"var(--purple)":"var(--brand)"}}>{s.type==="wc"?"⭐ 와일드카드":s.type==="small"?"소수조":"조 "+(si+1)}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)"}}>{s.players.length}/{s.cap}</span></div>
-                  {s.players.map((p,j)=><div key={j} className="fb" style={{marginTop:4,cursor:"pointer"}} onClick={e=>{e.stopPropagation();draftRemove(si,p.id)}}><span style={{fontSize:14,fontWeight:600}}>{p.name}</span><span className="fg"><GBadge gender={p.gender} /><Badge level={p.skill} /></span></div>)}
+                const isNext=si===draftNextIdx&&draftPool.length>0;
+                return <div key={si} className={"tc"+(s.type==="wc"?" bonus":"")} style={isNext?{borderColor:"var(--brand)",boxShadow:"0 0 0 2px var(--brand50)"}:{}}>
+                  <div className="fb" style={{marginBottom:8}}><span style={{fontSize:12,fontWeight:800,color:s.type==="wc"?"var(--gold)":s.type==="small"?"var(--purple)":"var(--brand)"}}>{s.type==="wc"?"⭐ 와일드카드":s.type==="small"?"소수조":"조 "+(si+1)}{isNext?" ← 다음":""}</span><span style={{fontSize:11,fontWeight:700,color:"var(--tx2)"}}>{s.players.length}/{s.cap}</span></div>
+                  {s.players.map((p,j)=><div key={j} className="fb" style={{marginTop:4,cursor:"pointer"}} onClick={()=>draftRemove(si,p.id)}><span style={{fontSize:14,fontWeight:600}}>{p.name}</span><span className="fg"><GBadge gender={p.gender} /><Badge level={p.skill} /></span></div>)}
                   {Array.from({length:s.cap-s.players.length}).map((_,j)=><div key={"e"+j} style={{marginTop:4,padding:"4px 0",fontSize:12,color:"var(--tx2)",border:"1px dashed var(--bdr)",borderRadius:7,textAlign:"center"}}>빈 자리</div>)}
                 </div>})}</div>
               <button className="btn bp bf" onClick={draftDone} disabled={draftPool.length>0} style={{marginTop:12}}>{draftPool.length>0?"미배정 "+draftPool.length+"명 남음":"편성 완료"}</button>
