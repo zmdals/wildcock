@@ -1005,38 +1005,9 @@ function App(){
   /* 기록실 */
   const[history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem("bp_history"))||[]}catch{return[]}});
   const[pubHistory,setPubHistory]=useState([]);
-  /* 클럽원 명부 — GitHub roster.json으로 모든 기기 공유
-     읽기: 앱 로드 시 정적 파일 fetch (토큰·rate limit 불필요, SW가 오프라인 사본 유지)
-     쓰기: 로컬 즉시 반영 + 토큰 있으면 GitHub 업로드 → 다른 폰은 다음 로드 때 수신
-     충돌: 갱신 시각(updated) 비교로 최신본 우선 */
-  const[roster,setRoster]=useState(()=>{try{const d=JSON.parse(localStorage.getItem("wc_roster"));if(Array.isArray(d))return d;return(d&&Array.isArray(d.members))?d.members:[]}catch{return[]}});
-  const rosterUpdatedRef=useRef((()=>{try{const d=JSON.parse(localStorage.getItem("wc_roster"));return(d&&!Array.isArray(d)&&d.updated)||0}catch{return 0}})());
-  useEffect(()=>{try{localStorage.setItem("wc_roster",JSON.stringify({updated:rosterUpdatedRef.current,members:roster}))}catch{}},[roster]);
-  useEffect(function(){ /* 공유 명부 수신 (원격이 더 최신일 때만 채택) */
-    fetch("roster.json",{cache:"no-cache"})
-      .then(function(r){return r.ok?r.json():null})
-      .then(function(doc){
-        if(!doc||!Array.isArray(doc.members))return;
-        if((doc.updated||0)>rosterUpdatedRef.current){rosterUpdatedRef.current=doc.updated||0;setRoster(doc.members)}
-      })
-      .catch(function(){});
-  },[]);
-  const pushRosterToGH=(members,updated)=>{
-    const token=localStorage.getItem("wc_gh_token");
-    if(!token){toast.show("👥 이 폰에만 저장됨 · 토큰 등록 시 모든 폰과 공유");return}
-    const url="https://api.github.com/repos/zmdals/wildcock/contents/roster.json";
-    fetch(url,{headers:{Authorization:"token "+token}})
-      .then(r=>r.ok?r.json():null)
-      .then(ex=>{
-        const content=btoa(unescape(encodeURIComponent(JSON.stringify({updated,members},null,2))));
-        const body={message:"클럽원 명부 갱신",content};if(ex&&ex.sha)body.sha=ex.sha;
-        return fetch(url,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
-      })
-      .then(r=>{if(r&&r.ok)toast.show("☁️ 명부 공유 완료 — 모든 폰에 반영돼요");else toast.show("⚠️ 명부 업로드 실패 · 이 폰에는 저장됨")})
-      .catch(()=>toast.show("⚠️ 명부 업로드 실패 · 이 폰에는 저장됨"));
-  };
+  /* 불러오기 상태 */
   const[rosterOpen,setRosterOpen]=useState(false);const[rosterSel,setRosterSel]=useState({});
-  const[recLvOn,setRecLvOn]=useState(true);const[rosterManage,setRosterManage]=useState(false);
+  const[recLvOn,setRecLvOn]=useState(true);
   /* 내 기록 + 공용 기록 합집합 (세션 id 중복 제거) */
   const allSessions=useMemo(()=>{
     const seen=new Set(),all=[];
@@ -1060,12 +1031,7 @@ function App(){
     })});
     return Object.values(map);
   },[allSessions]);
-  /* 불러오기 목록: 저장된 명부(우선) + 기록 멤버(_rec 표시) */
-  const rosterAll=useMemo(()=>{
-    const names=new Set(roster.map(m=>m.name));
-    return[...roster,...recordMembers.filter(m=>!names.has(m.name)).map(m=>({...m,_rec:true}))]
-      .sort((a,b)=>a.name.localeCompare(b.name,"ko"));
-  },[roster,recordMembers]);
+
   /* 추천 Lv — 3경기 미만이면 저장값(fallback) 유지 */
   const recommendLv=(name,fallback)=>{const g=eloData.games[name]||0;if(g<3)return fallback;return eloToLevel(eloData.ratings[name])};
   useEffect(()=>{try{localStorage.setItem("bp_history",JSON.stringify(history))}catch{}},[history]);
@@ -1286,22 +1252,8 @@ function App(){
   const resetAll=()=>{if(!window.confirm("⚠️ 모든 선수, 조편성, 매치 기록이 삭제됩니다.\n정말 초기화하시겠습니까?"))return;setPlayers([]);setTeams([]);setMatches([]);setExtraPlayer(null);setDualPartner(null);setWildcardId(null);setManualDraft(null);toast.show("전체 초기화 완료")};
   const addP=()=>{const name=nn.trim();if(!name)return;if(players.some(p=>p.name===name)){toast.show("⚠️ 이미 등록됨");return}if(!warnReset())return;setPlayers(p=>[...p,{id:nid,name,skill:ns,gender:ng}]);setNn("");setNs(3);setNg(null);toast.show("✅ "+name)};
 
-  /* ── 클럽원 명부 ── */
-  const commitRoster=(nextMembers)=>{
-    const updated=Date.now();
-    rosterUpdatedRef.current=updated;
-    setRoster(nextMembers);
-    pushRosterToGH(nextMembers,updated);
-  };
-  const saveToRoster=()=>{
-    if(!players.length){toast.show("저장할 선수가 없어요");return}
-    const map={};roster.forEach(m=>{map[m.name]=m});
-    players.forEach(p=>{map[p.name]={name:p.name,skill:p.skill,gender:p.gender||null}});
-    commitRoster(Object.values(map).sort((a,b)=>a.name.localeCompare(b.name,"ko")));
-  };
-  const removeFromRoster=(name)=>{if(!window.confirm(name+" 님을 명부에서 삭제할까요?\n(공유 명부에서도 삭제됩니다)"))return;commitRoster(roster.filter(m=>m.name!==name))};
   const loadFromRoster=()=>{
-    const sel=rosterAll.filter(m=>rosterSel[m.name]&&!players.some(p=>p.name===m.name));
+    const sel=recordMembers.filter(m=>rosterSel[m.name]&&!players.some(p=>p.name===m.name));
     if(!sel.length){toast.show("불러올 선수를 선택하세요");return}
     if(!warnReset())return;
     setPlayers(prev=>{
@@ -1483,35 +1435,29 @@ function App(){
               <button className="btn bp" onClick={addP} style={{height:43}}>추가</button>
             </div>
           </div>
-          <div className="cd">
-            <div className="fb"><p className="sl" style={{margin:0}}>👥 클럽원{rosterAll.length?` (${rosterAll.length}명)`:""}</p>
-              <div className="fg" style={{gap:6}}>
-                <button className="btn bs" onClick={saveToRoster} style={{padding:"5px 11px",fontSize:12}}>현재 선수 저장</button>
-                {rosterAll.length>0&&<button className="btn bs" onClick={()=>{setRosterOpen(!rosterOpen);setRosterSel({});setRosterManage(false)}} style={{padding:"5px 11px",fontSize:12}}>{rosterOpen?"닫기":"불러오기"}</button>}
-              </div>
+          {recordMembers.length>0&&<div className="cd">
+            <div className="fb"><p className="sl" style={{margin:0}}>👥 기록 멤버 ({recordMembers.length}명)</p>
+              <button className="btn bs" onClick={()=>{setRosterOpen(!rosterOpen);setRosterSel({})}} style={{padding:"5px 11px",fontSize:12}}>{rosterOpen?"닫기":"불러오기"}</button>
             </div>
-            {!rosterAll.length&&<p style={{fontSize:12,color:"var(--tx2)",margin:"10px 0 0",lineHeight:1.5}}>선수를 등록한 뒤 "현재 선수 저장"을 누르면 다음 모임부터 탭 몇 번으로 불러올 수 있어요. 매치 기록이 쌓이면 기록 속 멤버도 자동으로 나타나요.</p>}
-            {rosterOpen&&rosterAll.length>0&&<>
-              {!rosterManage&&<label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:600,color:"var(--tx)",margin:"12px 0 4px",cursor:"pointer"}}>
+            {rosterOpen&&<>
+              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:600,color:"var(--tx)",margin:"12px 0 4px",cursor:"pointer"}}>
                 <input type="checkbox" checked={recLvOn} onChange={e=>setRecLvOn(e.target.checked)} style={{width:16,height:16,accentColor:"var(--brand)"}} />
-                📈 추천 Lv 자동 설정<span style={{fontSize:11,color:"var(--tx2)",fontWeight:400}}>(전체 기록 기반 · 3경기 미만은 저장값)</span>
-              </label>}
-              {rosterManage&&<p style={{fontSize:12,color:"var(--tx2)",margin:"12px 0 4px"}}>탭해서 삭제 — 저장된 명부만 삭제할 수 있어요 (기록 멤버는 기록에서 자동 표시)</p>}
-              <div className="dp-grid">{(rosterManage?roster:rosterAll).map(m=>{
+                📈 추천 Lv 자동 설정<span style={{fontSize:11,color:"var(--tx2)",fontWeight:400}}>(전체 기록 기반 · 3경기 미만은 기록값)</span>
+              </label>
+              <div className="dp-grid">{recordMembers.map(m=>{
                 const inSession=players.some(p=>p.name===m.name);
                 const rl=recommendLv(m.name,m.skill);
                 const showLv=recLvOn?rl:m.skill;
-                return <button key={m.name} className={"dp-btn"+(rosterSel[m.name]?" sel":"")} disabled={inSession&&!rosterManage}
-                  onClick={()=>{if(rosterManage){removeFromRoster(m.name)}else{setRosterSel(s=>({...s,[m.name]:!s[m.name]}))}}}
-                  style={inSession&&!rosterManage?{opacity:.45}:{}}>
-                  <div style={{fontSize:13,fontWeight:700}}>{rosterManage?"🗑 ":""}{m.name}{inSession?" ✓":""}</div>
-                  <div style={{fontSize:11,color:recLvOn&&rl!==m.skill?"var(--brand)":"var(--tx2)",marginTop:2,fontWeight:recLvOn&&rl!==m.skill?700:400}}>{recLvOn&&rl!==m.skill?`Lv.${m.skill}→${rl} 📈`:`Lv.${showLv}`}{m.gender?" · "+GEN_L[m.gender]:""}{m._rec?" · 기록":""}</div>
+                return <button key={m.name} className={"dp-btn"+(rosterSel[m.name]?" sel":"")} disabled={inSession}
+                  onClick={()=>setRosterSel(s=>({...s,[m.name]:!s[m.name]}))}
+                  style={inSession?{opacity:.45}:{}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{m.name}{inSession?" ✓":""}</div>
+                  <div style={{fontSize:11,color:recLvOn&&rl!==m.skill?"var(--brand)":"var(--tx2)",marginTop:2,fontWeight:recLvOn&&rl!==m.skill?700:400}}>{recLvOn&&rl!==m.skill?`Lv.${m.skill}→${rl} 📈`:`Lv.${showLv}`}{GEN_L[m.gender]?" · "+GEN_L[m.gender]:""}</div>
                 </button>})}
               </div>
-              {!rosterManage&&<button className="btn bp bf" onClick={loadFromRoster} disabled={!Object.keys(rosterSel).some(k=>rosterSel[k])} style={{marginTop:12}}>선택한 {Object.keys(rosterSel).filter(k=>rosterSel[k]).length}명 불러오기</button>}
-              {roster.length>0&&<button onClick={()=>{setRosterManage(!rosterManage);setRosterSel({})}} style={{background:"none",border:"none",color:"var(--tx2)",fontSize:11,marginTop:10,cursor:"pointer",padding:0,fontFamily:"inherit",textDecoration:"underline"}}>{rosterManage?"편집 완료":"명부 편집 (탭해서 삭제)"}</button>}
+              <button className="btn bp bf" onClick={loadFromRoster} disabled={!Object.keys(rosterSel).some(k=>rosterSel[k])} style={{marginTop:12}}>선택한 {Object.keys(rosterSel).filter(k=>rosterSel[k]).length}명 불러오기</button>
             </>}
-          </div>
+          </div>}
           <div className="cd">
             <div className="fb" style={{marginBottom:12}}><p className="sl" style={{margin:0}}>선수 목록</p><div className="fg"><span style={{fontSize:13,color:"var(--tx2)",fontWeight:600}}>{players.length}명</span>{players.length>0&&<button className="btn bd" onClick={resetAll} style={{padding:"4px 10px",fontSize:11}}>전체 초기화</button>}</div></div>
             {!players.length?<div className="es"><div className="es-i">👤</div><div className="es-t">선수를 추가해주세요</div><div className="es-s">최소 {minPlayers}명</div></div>:
