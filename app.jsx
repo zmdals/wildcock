@@ -1148,11 +1148,22 @@ function App(){
         }
         return fetch(apiUrl,{method:"PUT",headers:{Authorization:"token "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
       })
-      .then(r=>{if(r.ok){toast.show("☁️ GitHub에 자동 저장 완료!")}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
+      .then(r=>{if(r.ok){setPubHistory(prev=>{const ids=new Set(prev.map(s=>s.id));return ids.has(session.id)?prev:[session,...prev]});toast.show("☁️ GitHub에 자동 저장 완료!")}else{toast.show("⚠️ GitHub 저장 실패 ("+r.status+")")}})
       .catch(()=>toast.show("⚠️ GitHub 연결 실패"));
   };
   /* history/index.json 매니페스트 갱신은 GitHub Actions(.github/workflows/history-index.yml)가 담당 —
      앱이든 GitHub 웹 업로드든 history/에 파일이 추가되면 자동으로 목차가 재생성됨 */
+
+  /* 미업로드 기록 자동 push — 토큰 없이 저장했다가 나중에 토큰 등록한 경우 대비
+     pubHistory 로드 완료 후, 로컬에만 있고 공용에 없는 기록을 자동 업로드 */
+  useEffect(()=>{
+    const token=localStorage.getItem("wc_gh_token");
+    if(!token||!pubHistory||!history.length)return;
+    const pubIds=new Set((pubHistory||[]).map(s=>s.id));
+    const unpushed=history.filter(s=>s.id&&!pubIds.has(s.id));
+    if(!unpushed.length)return;
+    unpushed.forEach(session=>pushSessionToGH(session,token));
+  },[pubHistory]);
 
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
   const delPubSession=(sess)=>{
