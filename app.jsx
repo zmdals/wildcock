@@ -1168,7 +1168,7 @@ function App(){
           body:JSON.stringify({message:"기록 삭제: "+fname,sha:meta.sha})});
       })
       .then(r=>{
-        if(r.ok){setPubHistory(prev=>prev.filter(s=>s.id!==sess.id));toast.show("🗑 공용 기록 삭제 완료")}
+        if(r.ok){setPubHistory(prev=>prev.filter(s=>s.id!==sess.id));setHistory(prev=>prev.filter(s=>s.id!==sess.id));toast.show("🗑 공용 기록 삭제 완료")}
         else{toast.show("⚠️ 삭제 실패 ("+r.status+")")}
       })
       .catch(()=>toast.show("⚠️ 삭제 실패 — 파일을 찾을 수 없거나 권한 부족"));
