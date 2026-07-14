@@ -219,6 +219,8 @@ function eloInit(skill){return 1500+(((+skill||3))-3)*100}
 function eloExpected(rA,rB){return 1/(1+Math.pow(10,(rB-rA)/400))}
 /* 점수차 가중: 21-19 → ×1.05, 21-11 → ×1.24, 21-0 → ×1.5 */
 function eloMargin(s1,s2){const a=+s1,b=+s2,mx=Math.max(a,b);if(!mx)return 1;return 1+0.5*Math.min(1,Math.abs(a-b)/mx)}
+/* 성별 정규화: "male"→"M", "female"→"F", 그 외→null */
+function normGender(g){if(!g)return null;var u=(""+g).toUpperCase();if(u==="M"||u==="MALE")return"M";if(u==="F"||u==="FEMALE")return"F";return null}
 /* 2인 팀의 성별 구성 — 성별 미상·2인 아님 → null (보정 미적용) */
 function eloTeamComp(names,genderOf){
   if(!names||names.length!==2)return null;
@@ -236,7 +238,7 @@ function eloCompute(sessions,K,bonus){
   for(const s of sorted){
     if(!s)continue;
     const skillOf={},genderOf={};
-    (s.players||[]).forEach(p=>{if(p&&p.name){skillOf[p.name]=p.skill;genderOf[p.name]=p.gender||null}});
+    (s.players||[]).forEach(p=>{if(p&&p.name){skillOf[p.name]=p.skill;genderOf[p.name]=normGender(p.gender)}});
     for(const m of(s.matchData||[])){
       const s1=+m.s1,s2=+m.s2;
       if(!isFinite(s1)||!isFinite(s2)||s1===s2)continue;
@@ -266,7 +268,7 @@ function eloEstimateCompBonus(sessions){
   const per={};
   for(const s of(sessions||[])){
     if(!s)continue;
-    const genderOf={};(s.players||[]).forEach(p=>{if(p&&p.name)genderOf[p.name]=p.gender||null});
+    const genderOf={};(s.players||[]).forEach(p=>{if(p&&p.name)genderOf[p.name]=normGender(p.gender)});
     for(const m of(s.matchData||[])){
       const s1=+m.s1,s2=+m.s2;
       if(!isFinite(s1)||!isFinite(s2)||s1===s2)continue;

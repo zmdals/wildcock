@@ -1021,13 +1021,14 @@ function App(){
     return{ratings:r.ratings,games:r.games,compBonus:est.bonus};
   },[allSessions]);
   /* 기록에 등장한 멤버 — 최신 세션 우선으로 성별·마지막 레벨 채택 */
+  const normGender=(g)=>{if(!g)return null;const u=(g+"").toUpperCase();if(u==="M"||u==="MALE")return"M";if(u==="F"||u==="FEMALE")return"F";return null};
   const recordMembers=useMemo(()=>{
     const sorted=[...allSessions].sort((a,b)=>{const d1=a.date||"",d2=b.date||"";return d1>d2?-1:d1<d2?1:((b.id||0)-(a.id||0))});
     const map={};
     sorted.forEach(s=>{(s.players||[]).forEach(p=>{
       if(!p||!p.name)return;
-      if(!map[p.name])map[p.name]={name:p.name,skill:p.skill||3,gender:p.gender||null};
-      else if(!map[p.name].gender&&p.gender)map[p.name].gender=p.gender;
+      if(!map[p.name])map[p.name]={name:p.name,skill:p.skill||3,gender:normGender(p.gender)};
+      else if(!map[p.name].gender&&p.gender)map[p.name].gender=normGender(p.gender);
     })});
     return Object.values(map);
   },[allSessions]);
