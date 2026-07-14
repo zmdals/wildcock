@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1784043070987,
+    "date": "2026-07-14",
+    "teamSize": 2,
+    "mt": "roundrobin",
+    "players": [
+      {
+        "name": "임승민",
+        "skill": 5,
+        "gender": "M"
+      },
+      {
+        "name": "김보민",
+        "skill": 2,
+        "gender": "F"
+      },
+      {
+        "name": "박가민",
+        "skill": 3,
+        "gender": "F"
+      },
+      {
+        "name": "이진홍",
+        "skill": 5,
+        "gender": "M"
+      }
+    ],
+    "matchData": [
+      {
+        "t1": [
+          "임승민",
+          "김보민"
+        ],
+        "t2": [
+          "이진홍",
+          "박가민"
+        ],
+        "s1": 25,
+        "s2": 24
+      }
+    ]
+  }
+]
