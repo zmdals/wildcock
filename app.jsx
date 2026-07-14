@@ -559,7 +559,7 @@ function DashRecord({label,icon,items,color}){
 }
 
 /* 기록실 탭 */
-function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
+function RecordsTab({history,pubHistory,onDelete,onDeletePub,onExport,onImport,onShare}){
   const[view,setView]=useState("dashboard");
   const[selPlayer,setSelPlayer]=useState(null);
   const[expandSess,setExpandSess]=useState(null);
@@ -823,6 +823,9 @@ function RecordsTab({history,pubHistory,onDelete,onExport,onImport,onShare}){
               {!isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
                 <button className="btn bs" onClick={function(e){e.stopPropagation();onShare(sess)}} style={{fontSize:11,padding:"4px 10px"}}>📤</button>
                 <button className="btn bd" onClick={e=>{e.stopPropagation();onDelete(sess.id)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
+              </div>}
+              {isPub&&<div className="fg" style={{gap:6,flexShrink:0}}>
+                <button className="btn bd" onClick={e=>{e.stopPropagation();onDeletePub(sess)}} style={{fontSize:11,padding:"4px 10px"}}>삭제</button>
               </div>}
             </div>
             {isOpen&&<div style={{paddingBottom:14,marginLeft:10,borderLeft:"2px solid var(--g3)",paddingLeft:14}}>
@@ -1152,6 +1155,24 @@ function App(){
      앱이든 GitHub 웹 업로드든 history/에 파일이 추가되면 자동으로 목차가 재생성됨 */
 
   const delSession=id=>{if(!window.confirm("이 기록을 삭제할까요?"))return;setHistory(prev=>prev.filter(s=>s.id!==id))};
+  const delPubSession=(sess)=>{
+    const token=localStorage.getItem("wc_gh_token");
+    if(!token){toast.show("⚠️ 토큰이 등록되어야 공용 기록을 삭제할 수 있어요");return}
+    if(!window.confirm("공용 기록을 삭제할까요?\nGitHub에서도 파일이 삭제됩니다."))return;
+    const fname="record_"+(sess.date||"unknown")+".json";
+    const url="https://api.github.com/repos/zmdals/wildcock/contents/history/"+fname;
+    fetch(url,{headers:{Authorization:"token "+token}})
+      .then(r=>{if(!r.ok)throw new Error("파일 조회 실패");return r.json()})
+      .then(meta=>{
+        return fetch(url,{method:"DELETE",headers:{Authorization:"token "+token,"Content-Type":"application/json"},
+          body:JSON.stringify({message:"기록 삭제: "+fname,sha:meta.sha})});
+      })
+      .then(r=>{
+        if(r.ok){setPubHistory(prev=>prev.filter(s=>s.id!==sess.id));toast.show("🗑 공용 기록 삭제 완료")}
+        else{toast.show("⚠️ 삭제 실패 ("+r.status+")")}
+      })
+      .catch(()=>toast.show("⚠️ 삭제 실패 — 파일을 찾을 수 없거나 권한 부족"));
+  };
   var shareOrDownload=function(blob,fname,title,toastMsg){
     /* 모바일/태블릿 판별: userAgent 기반 (데스크톱 Chrome도 Web Share API를 지원하므로 API 존재 여부만으로는 부족) */
     var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
@@ -1591,7 +1612,7 @@ function App(){
         </div>}
       </div>}
 
-      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onExport={exportHistory} onImport={importHistory} onShare={shareSession} />}
+      {mainTab==="records"&&<RecordsTab history={history} pubHistory={pubHistory} onDelete={delSession} onDeletePub={delPubSession} onExport={exportHistory} onImport={importHistory} onShare={shareSession} />}
 
       {mainTab==="roulette"&&<div>
         <div className="cd">
