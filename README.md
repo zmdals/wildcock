@@ -16,7 +16,6 @@
 | `tests/core.test.js` | 코어 로직 테스트 28개 (배포와 무관) |
 | `history/` | 매치 기록 json + index.json(자동 생성) |
 | `uploads/` | favicon·로고 (192/512는 PWA 아이콘 겸용) |
-| `roster.json` | 공유 클럽원 명부 (토큰 있는 폰에서 첫 저장 시 자동 생성) |
 
 ## 배포 방법
 
