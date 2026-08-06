@@ -561,6 +561,7 @@ function DashRecord({label,icon,items,color}){
 /* 기록실 탭 */
 function RecordsTab({history,pubHistory,onDelete,onDeletePub,onExport,onImport,onShare}){
   const[view,setView]=useState("dashboard");
+  const[showPct,setShowPct]=useState(false);
   const[selPlayer,setSelPlayer]=useState(null);
   const[expandSess,setExpandSess]=useState(null);
 
@@ -693,7 +694,9 @@ function RecordsTab({history,pubHistory,onDelete,onDeletePub,onExport,onImport,o
     </div>}
 
     {view==="attendance"&&<div className="cd">
-      <p className="sl">📋 참여율 ({stats.players.length}명)</p>
+      <div className="fb"><p className="sl" style={{margin:0}}>📋 참여율 ({stats.players.length}명)</p>
+        <button className="btn bs" onClick={()=>setShowPct(!showPct)} style={{padding:"4px 10px",fontSize:11}}>{showPct?"% 숨기기":"% 보기"}</button>
+      </div>
       <p style={{fontSize:12,color:"var(--tx2)",marginBottom:12}}>총 {stats.dash.totalSessions}세션 기준 · 참석 횟수순</p>
       {[...stats.players].sort((a,b)=>b.sessCnt-a.sessCnt||b.games-a.games).map((p,i)=>{
         const pct=stats.dash.totalSessions?Math.round(p.sessCnt/stats.dash.totalSessions*100):0;
@@ -704,11 +707,11 @@ function RecordsTab({history,pubHistory,onDelete,onDeletePub,onExport,onImport,o
               <div style={{fontSize:11,color:"var(--tx2)",marginTop:2}}>{p.sessCnt}회 참석 · {p.games}경기 · {p.w}승 {p.l}패</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:17,fontWeight:800,color:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--tx2)"}}>{pct}%</div>
-              <div style={{fontSize:10,color:"var(--tx2)"}}>출석</div>
+              {showPct&&<><div style={{fontSize:17,fontWeight:800,color:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--tx2)"}}>{pct}%</div>
+              <div style={{fontSize:10,color:"var(--tx2)"}}>출석</div></>}
             </div>
           </div>
-          <div className="rb" style={{marginTop:6,height:4}}><div className="rf" style={{width:pct+"%",background:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--g2)"}} /></div>
+          {showPct&&<div className="rb" style={{marginTop:6,height:4}}><div className="rf" style={{width:pct+"%",background:pct>=70?"var(--green)":pct>=40?"var(--pri)":"var(--g2)"}} /></div>}
         </div>
       })}
     </div>}
@@ -1477,6 +1480,7 @@ function App(){
                 <input type="checkbox" checked={recLvOn} onChange={e=>setRecLvOn(e.target.checked)} style={{width:16,height:16,accentColor:"var(--brand)"}} />
                 📈 추천 Lv 자동 설정<span style={{fontSize:11,color:"var(--tx2)",fontWeight:400}}>(전체 기록 기반 · 3경기 미만은 기록값)</span>
               </label>
+              {(()=>{const avail=recordMembers.filter(m=>!players.some(p=>p.name===m.name));const selCount=avail.filter(m=>rosterSel[m.name]).length;const allSel=avail.length>0&&selCount===avail.length;return <button className="btn bs" onClick={()=>{const next={};if(!allSel)avail.forEach(m=>{next[m.name]=true});setRosterSel(next)}} style={{fontSize:11,padding:"4px 10px",marginBottom:8}}>{allSel?"전체 해제":"전체 선택 ("+avail.length+"명)"}</button>})()}
               <div className="dp-grid">{recordMembers.map(m=>{
                 const inSession=players.some(p=>p.name===m.name);
                 const rl=recommendLv(m.name,m.skill);
